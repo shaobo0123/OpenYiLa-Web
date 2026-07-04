@@ -5,6 +5,8 @@ export type MessageKey =
   | "app.badge.ready"
   | "app.badge.unsupported"
   | "device.addedDone"
+  | "device.addTitle"
+  | "device.addHint"
   | "device.list"
   | "device.listHint"
   | "device.none"
@@ -21,8 +23,13 @@ export type MessageKey =
   | "action.manage"
   | "action.delete"
   | "action.back"
+  | "action.changePassword"
+  | "action.confirmChangePassword"
   | "nav.admin"
   | "field.password"
+  | "field.oldPassword"
+  | "field.newPassword"
+  | "field.confirmPassword"
   | "field.openTime"
   | "field.waitTime"
   | "field.closeTime"
@@ -30,7 +37,11 @@ export type MessageKey =
   | "status.ready"
   | "status.searching"
   | "status.opening"
+  | "status.changingPassword"
   | "status.passwordInvalid"
+  | "status.passwordMismatch"
+  | "status.passwordChangeSuccess"
+  | "status.passwordChangeFailed"
   | "status.unlockSuccess"
   | "status.unlockFailed"
   | "status.battery"
@@ -44,6 +55,7 @@ export type MessageKey =
   | "admin.reset"
   | "admin.savedFor"
   | "admin.resetDoneFor"
+  | "admin.passwordTitle"
   | "admin.reverseOn"
   | "admin.reverseOff";
 
@@ -53,8 +65,10 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "app.badge.ready": "蓝牙可用",
     "app.badge.unsupported": "不支持",
     "device.addedDone": "设备已添加，点击设备图标输入密码开门",
+    "device.addTitle": "添加设备",
+    "device.addHint": "在这里搜索并添加 YiLa 蓝牙设备。",
     "device.list": "我的设备",
-    "device.listHint": "每个设备卡片都可以开门或进入设置，删除设备在设置里操作。",
+    "device.listHint": "每个设备卡片都可以开门或进入设置。",
     "device.none": "未添加设备",
     "device.deleteConfirm": "确定删除 {name} 吗？",
     "device.deleted": "{name} 已删除",
@@ -69,8 +83,13 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.manage": "设置",
     "action.delete": "删除",
     "action.back": "返回",
+    "action.changePassword": "修改密码",
+    "action.confirmChangePassword": "确认修改",
     "nav.admin": "管理后台",
     "field.password": "设备密码",
+    "field.oldPassword": "当前密码",
+    "field.newPassword": "新密码",
+    "field.confirmPassword": "确认新密码",
     "field.openTime": "开锁时间",
     "field.waitTime": "等待时间",
     "field.closeTime": "关锁时间",
@@ -78,7 +97,11 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "status.ready": "就绪",
     "status.searching": "正在搜索设备...",
     "status.opening": "正在开门...",
+    "status.changingPassword": "正在修改密码...",
     "status.passwordInvalid": "密码必须是 6 位数字",
+    "status.passwordMismatch": "两次输入的新密码不一致",
+    "status.passwordChangeSuccess": "密码修改成功",
+    "status.passwordChangeFailed": "密码修改失败：{message}",
     "status.unlockSuccess": "开门成功",
     "status.unlockFailed": "开门失败：{message}",
     "status.battery": "电量 {level}/5",
@@ -92,6 +115,7 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "admin.reset": "恢复默认",
     "admin.savedFor": "{name} 的设置已保存",
     "admin.resetDoneFor": "{name} 已恢复默认设置",
+    "admin.passwordTitle": "修改密码",
     "admin.reverseOn": "反向",
     "admin.reverseOff": "正常",
   },
@@ -100,8 +124,10 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "app.badge.ready": "Bluetooth Ready",
     "app.badge.unsupported": "Unsupported",
     "device.addedDone": "Device added. Click the device icon and enter the password.",
+    "device.addTitle": "Add Device",
+    "device.addHint": "Search and add a YiLa Bluetooth device here.",
     "device.list": "My Devices",
-    "device.listHint": "Each device card can open or configure the device. Delete is in settings.",
+    "device.listHint": "Each device card can open or configure the device.",
     "device.none": "No device added",
     "device.deleteConfirm": "Delete {name}?",
     "device.deleted": "{name} deleted",
@@ -116,8 +142,13 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.manage": "Settings",
     "action.delete": "Delete",
     "action.back": "Back",
+    "action.changePassword": "Change Password",
+    "action.confirmChangePassword": "Confirm Change",
     "nav.admin": "Admin",
     "field.password": "Password",
+    "field.oldPassword": "Current password",
+    "field.newPassword": "New password",
+    "field.confirmPassword": "Confirm new password",
     "field.openTime": "Open time",
     "field.waitTime": "Wait time",
     "field.closeTime": "Close time",
@@ -125,7 +156,11 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "status.ready": "Ready",
     "status.searching": "Searching for device...",
     "status.opening": "Opening...",
+    "status.changingPassword": "Changing password...",
     "status.passwordInvalid": "Password must be 6 digits",
+    "status.passwordMismatch": "New passwords do not match",
+    "status.passwordChangeSuccess": "Password changed",
+    "status.passwordChangeFailed": "Password change failed: {message}",
     "status.unlockSuccess": "Unlock success",
     "status.unlockFailed": "Unlock failed: {message}",
     "status.battery": "Battery {level}/5",
@@ -139,6 +174,7 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "admin.reset": "Reset defaults",
     "admin.savedFor": "Settings saved for {name}",
     "admin.resetDoneFor": "Defaults restored for {name}",
+    "admin.passwordTitle": "Change password",
     "admin.reverseOn": "Reverse",
     "admin.reverseOff": "Normal",
   },

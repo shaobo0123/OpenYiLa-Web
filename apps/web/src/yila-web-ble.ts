@@ -6,8 +6,10 @@ import {
   NUS_RX_CHAR_UUID,
   NUS_SERVICE_UUID,
   NUS_TX_CHAR_UUID,
+  buildChangePasswordCommand,
   buildOpenCommand,
   parseDeviceResponse,
+  type ChangePasswordOptions,
   type DeviceResponse,
   type UnlockOptions,
 } from "@yila/core";
@@ -34,6 +36,10 @@ export class YilaWebBleClient {
 
   get connected(): boolean {
     return Boolean(this.server?.connected && this.tx && this.rx);
+  }
+
+  get connectedDeviceId(): string | null {
+    return this.connected ? this.device?.id || null : null;
   }
 
   async connect(options: DeviceRequestOptions = {}): Promise<ConnectionInfo> {
@@ -106,11 +112,21 @@ export class YilaWebBleClient {
   }
 
   async open(options: UnlockOptions, timeoutMs = DEFAULT_RESPONSE_TIMEOUT_MS): Promise<DeviceResponse> {
+    return this.writeCommand(buildOpenCommand(options), timeoutMs);
+  }
+
+  async changePassword(
+    options: ChangePasswordOptions,
+    timeoutMs = DEFAULT_RESPONSE_TIMEOUT_MS,
+  ): Promise<DeviceResponse> {
+    return this.writeCommand(buildChangePasswordCommand(options), timeoutMs);
+  }
+
+  private async writeCommand(command: Uint8Array, timeoutMs: number): Promise<DeviceResponse> {
     if (!this.tx || !this.rx) {
       throw new Error("Device is not connected.");
     }
 
-    const command = buildOpenCommand(options);
     const payload = new ArrayBuffer(command.byteLength);
     new Uint8Array(payload).set(command);
     const responsePromise = waitForResponse(this.rx, timeoutMs);

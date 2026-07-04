@@ -40,7 +40,7 @@ let t = createTranslator(locale);
 let connectedDeviceName = "";
 let activeModalDeviceId = "";
 let activeAdminDeviceId = "";
-let isAddPanelOpen = false;
+let isPasswordPanelOpen = false;
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <main class="shell">
@@ -69,19 +69,30 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
               <h2 data-i18n="device.list"></h2>
               <p data-i18n="device.listHint"></p>
             </div>
-            <button id="toggleAddDeviceButton" class="secondary compact-button" type="button" data-i18n="action.addDevice"></button>
-          </div>
-          <div id="addDevicePanel" class="add-device-panel">
-            <label>
-              <span data-i18n="device.filter"></span>
-              <input id="deviceNamePrefix" value="${DEFAULTS.deviceName}" autocomplete="off" />
-            </label>
-            <button id="searchDeviceButton" class="secondary" type="button" data-i18n="action.searchDevice"></button>
-            <p id="deviceStatus" class="status-line"></p>
+            <button id="addDeviceNavButton" class="secondary compact-button" type="button" data-i18n="action.addDevice"></button>
           </div>
           <div id="deviceList" class="device-list"></div>
           <p id="result" class="result"></p>
         </div>
+      </section>
+
+      <section id="addDeviceView" class="panel add-device-view hidden">
+        <div class="section-heading admin-heading">
+          <div>
+            <h2 data-i18n="device.addTitle"></h2>
+            <p data-i18n="device.addHint"></p>
+          </div>
+          <button id="backFromAddDeviceButton" class="ghost compact-button" type="button" data-i18n="action.back"></button>
+        </div>
+        <div class="add-device-panel">
+          <label>
+            <span data-i18n="device.filter"></span>
+            <input id="deviceNamePrefix" value="${DEFAULTS.deviceName}" autocomplete="off" />
+          </label>
+          <button id="searchDeviceButton" class="secondary" type="button" data-i18n="action.searchDevice"></button>
+          <p id="deviceStatus" class="status-line"></p>
+        </div>
+        <p id="addDeviceResult" class="result"></p>
       </section>
 
       <section id="adminView" class="panel admin-panel hidden" data-i18n-aria-label="nav.admin">
@@ -124,6 +135,26 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
           <button id="deleteDeviceButton" class="danger" type="button" data-i18n="action.delete"></button>
         </div>
         <p id="adminResult" class="result"></p>
+        <button id="revealPasswordPanelButton" class="ghost password-button" type="button" data-i18n="action.changePassword"></button>
+        <div id="passwordPanel" class="password-panel hidden">
+          <h3 data-i18n="admin.passwordTitle"></h3>
+          <div class="field-grid password-grid">
+            <label>
+              <span data-i18n="field.oldPassword"></span>
+              <input id="oldPassword" inputmode="numeric" maxlength="6" type="password" autocomplete="off" />
+            </label>
+            <label>
+              <span data-i18n="field.newPassword"></span>
+              <input id="newPassword" inputmode="numeric" maxlength="6" type="password" autocomplete="off" />
+            </label>
+            <label>
+              <span data-i18n="field.confirmPassword"></span>
+              <input id="confirmPassword" inputmode="numeric" maxlength="6" type="password" autocomplete="off" />
+            </label>
+          </div>
+          <button id="changePasswordButton" class="secondary password-button" type="button" data-i18n="action.confirmChangePassword"></button>
+          <p id="passwordResult" class="result"></p>
+        </div>
       </section>
     </section>
   </main>
@@ -152,25 +183,32 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 `;
 
 const supportBadge = byId<HTMLSpanElement>("supportBadge");
-const toggleAddDeviceButton = byId<HTMLButtonElement>("toggleAddDeviceButton");
+const addDeviceNavButton = byId<HTMLButtonElement>("addDeviceNavButton");
 const searchDeviceButton = byId<HTMLButtonElement>("searchDeviceButton");
 const openButton = byId<HTMLButtonElement>("openButton");
 const closeModalButton = byId<HTMLButtonElement>("closeModalButton");
 const statusLine = byId<HTMLParagraphElement>("deviceStatus");
+const addDeviceResult = byId<HTMLParagraphElement>("addDeviceResult");
 const result = byId<HTMLParagraphElement>("result");
 const adminResult = byId<HTMLParagraphElement>("adminResult");
 const localeSelect = byId<HTMLSelectElement>("localeSelect");
 const controlView = byId<HTMLElement>("controlView");
+const addDeviceView = byId<HTMLElement>("addDeviceView");
 const adminView = byId<HTMLElement>("adminView");
+const backFromAddDeviceButton = byId<HTMLButtonElement>("backFromAddDeviceButton");
 const backToDevicesButton = byId<HTMLButtonElement>("backToDevicesButton");
 const saveSettingsButton = byId<HTMLButtonElement>("saveSettingsButton");
 const resetSettingsButton = byId<HTMLButtonElement>("resetSettingsButton");
 const deleteDeviceButton = byId<HTMLButtonElement>("deleteDeviceButton");
+const revealPasswordPanelButton = byId<HTMLButtonElement>("revealPasswordPanelButton");
+const changePasswordButton = byId<HTMLButtonElement>("changePasswordButton");
+const passwordPanel = byId<HTMLElement>("passwordPanel");
 const adminBattery = byId<HTMLElement>("adminBattery");
 const settingsSummary = byId<HTMLElement>("settingsSummary");
 const modalSettingsSummary = byId<HTMLElement>("modalSettingsSummary");
 const modalDeviceName = byId<HTMLElement>("modalDeviceName");
 const modalResult = byId<HTMLParagraphElement>("modalResult");
+const passwordResult = byId<HTMLParagraphElement>("passwordResult");
 const passwordModal = byId<HTMLElement>("passwordModal");
 const deviceList = byId<HTMLElement>("deviceList");
 const adminDeviceTitle = byId<HTMLElement>("adminDeviceTitle");
@@ -182,12 +220,11 @@ applyTranslations();
 updateBluetoothSupport();
 renderDeviceList();
 syncAdminPanel();
-syncAddDevicePanel();
 
 searchDeviceButton.addEventListener("click", async () => {
   const namePrefix = deviceNamePrefix.value.trim() || DEFAULTS.deviceName;
   saveSearchPrefix(namePrefix);
-  setBusy(true, t("status.searching"));
+  setBusy(true, t("status.searching"), addDeviceResult);
   try {
     const info = await client.connect({ namePrefix });
     const device = upsertDevice({
@@ -197,14 +234,14 @@ searchDeviceButton.addEventListener("click", async () => {
     });
     connectedDeviceName = info.deviceName;
     selectAdminDevice(device.id);
-    isAddPanelOpen = false;
     renderDeviceList();
     syncAdminPanel();
-    syncAddDevicePanel();
     statusLine.textContent = t("device.connected", { name: info.deviceName });
     result.textContent = t("device.addedDone");
+    addDeviceResult.textContent = t("device.addedDone");
+    setView("control");
   } catch (error) {
-    result.textContent = errorMessage(error);
+    addDeviceResult.textContent = errorMessage(error);
   } finally {
     setBusy(false);
   }
@@ -226,33 +263,22 @@ openButton.addEventListener("click", async () => {
 
   setBusy(true, t("status.opening"), modalResult);
   try {
-    if (!client.connected) {
-      const info = await client.connect({ namePrefix: device.name || readSearchPrefix() });
-      connectedDeviceName = info.deviceName;
-      upsertDevice({
-        id: info.deviceId,
-        name: info.deviceName,
-        lastConnectedAt: Date.now(),
-      });
-      renderDeviceList();
-      syncAdminPanel();
-    }
+    const targetDevice = await ensureConnectedToDevice(device);
 
     const response = await client.open({
       password,
-      openTimeMs: device.settings.openTimeMs,
-      waitTimeMs: device.settings.waitTimeMs,
-      closeTimeMs: device.settings.closeTimeMs,
-      reverse: device.settings.reverse,
+      openTimeMs: targetDevice.settings.openTimeMs,
+      waitTimeMs: targetDevice.settings.waitTimeMs,
+      closeTimeMs: targetDevice.settings.closeTimeMs,
+      reverse: targetDevice.settings.reverse,
     });
 
     upsertDevice({
-      ...device,
+      ...targetDevice,
       lastOpenedAt: Date.now(),
       ...(response.batteryLevel ? { batteryLevel: response.batteryLevel } : {}),
     });
     renderDeviceList();
-    syncAddDevicePanel();
     syncAdminPanel();
 
     modalResult.textContent = response.success
@@ -284,18 +310,19 @@ localeSelect.addEventListener("change", () => {
   updateBluetoothSupport();
   renderDeviceList();
   syncAdminPanel();
-  syncAddDevicePanel();
 });
 
-toggleAddDeviceButton.addEventListener("click", () => {
-  isAddPanelOpen = !isAddPanelOpen;
-  syncAddDevicePanel();
-  if (isAddPanelOpen) {
-    deviceNamePrefix.focus();
-  }
+addDeviceNavButton.addEventListener("click", () => {
+  statusLine.textContent = connectedDeviceName
+    ? t("device.connected", { name: connectedDeviceName })
+    : t("device.notConnected");
+  addDeviceResult.textContent = "";
+  setView("addDevice");
+  deviceNamePrefix.focus();
 });
 
 backToDevicesButton.addEventListener("click", () => setView("control"));
+backFromAddDeviceButton.addEventListener("click", () => setView("control"));
 
 deviceNamePrefix.addEventListener("change", () => {
   saveSearchPrefix(deviceNamePrefix.value.trim() || DEFAULTS.deviceName);
@@ -316,7 +343,6 @@ saveSettingsButton.addEventListener("click", () => {
 
   renderDeviceList();
   syncAdminPanel();
-  syncAddDevicePanel();
   adminResult.textContent = t("admin.savedFor", { name: updated.name });
 });
 
@@ -336,7 +362,6 @@ resetSettingsButton.addEventListener("click", () => {
   loadSettingsIntoForm(updated.settings);
   renderDeviceList();
   syncAdminPanel();
-  syncAddDevicePanel();
   adminResult.textContent = t("admin.resetDoneFor", { name: updated.name });
 });
 
@@ -349,13 +374,71 @@ deleteDeviceButton.addEventListener("click", () => {
   deleteDevice(device.id);
 });
 
+revealPasswordPanelButton.addEventListener("click", () => {
+  isPasswordPanelOpen = !isPasswordPanelOpen;
+  syncPasswordPanel();
+  if (isPasswordPanelOpen) {
+    byId<HTMLInputElement>("oldPassword").focus();
+  }
+});
+
+changePasswordButton.addEventListener("click", async () => {
+  const device = getSelectedAdminDevice();
+  if (!device) {
+    passwordResult.textContent = t("admin.noDevice");
+    return;
+  }
+
+  const oldPassword = byId<HTMLInputElement>("oldPassword").value.trim();
+  const newPassword = byId<HTMLInputElement>("newPassword").value.trim();
+  const confirmPassword = byId<HTMLInputElement>("confirmPassword").value.trim();
+  if (!/^\d{6}$/.test(oldPassword) || !/^\d{6}$/.test(newPassword)) {
+    passwordResult.textContent = t("status.passwordInvalid");
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    passwordResult.textContent = t("status.passwordMismatch");
+    return;
+  }
+
+  setBusy(true, t("status.changingPassword"), passwordResult);
+  try {
+    const targetDevice = await ensureConnectedToDevice(device);
+    const response = await client.changePassword({ oldPassword, newPassword });
+    if (response.batteryLevel) {
+      upsertDevice({ ...targetDevice, batteryLevel: response.batteryLevel });
+    }
+    renderDeviceList();
+    syncAdminPanel();
+    passwordResult.textContent = response.success
+      ? t("status.passwordChangeSuccess")
+      : t("status.passwordChangeFailed", { message: response.message });
+    if (response.batteryLevel) {
+      passwordResult.textContent += ` · ${t("status.battery", { level: response.batteryLevel })}`;
+    }
+    if (response.success) {
+      clearPasswordChangeForm();
+    }
+  } catch (error) {
+    passwordResult.textContent = errorMessage(error);
+  } finally {
+    setBusy(false);
+  }
+});
+
 function byId<T extends HTMLElement>(id: string): T {
   return document.getElementById(id) as T;
 }
 
 function setBusy(isBusy: boolean, message?: string, target: HTMLElement = result): void {
+  addDeviceNavButton.disabled = isBusy;
   searchDeviceButton.disabled = isBusy;
   openButton.disabled = isBusy;
+  saveSettingsButton.disabled = isBusy || !getSelectedAdminDevice();
+  resetSettingsButton.disabled = isBusy || !getSelectedAdminDevice();
+  deleteDeviceButton.disabled = isBusy || !getSelectedAdminDevice();
+  revealPasswordPanelButton.disabled = isBusy || !getSelectedAdminDevice();
+  changePasswordButton.disabled = isBusy || !getSelectedAdminDevice();
   if (message) {
     target.textContent = message;
   }
@@ -455,8 +538,11 @@ function openAdminForDevice(deviceId: string): void {
   }
 
   selectAdminDevice(device.id);
+  isPasswordPanelOpen = false;
   syncAdminPanel();
   adminResult.textContent = "";
+  passwordResult.textContent = "";
+  clearPasswordChangeForm();
   setView("admin");
 }
 
@@ -481,16 +567,8 @@ function deleteDevice(deviceId: string): void {
   }
   renderDeviceList();
   syncAdminPanel();
-  syncAddDevicePanel();
   setView("control");
   result.textContent = t("device.deleted", { name: device.name });
-}
-
-function syncAddDevicePanel(): void {
-  const hasDevices = readDevices().length > 0;
-  const shouldShowPanel = !hasDevices || isAddPanelOpen;
-  byId<HTMLElement>("addDevicePanel").classList.toggle("hidden", !shouldShowPanel);
-  toggleAddDeviceButton.classList.toggle("hidden", !hasDevices);
 }
 
 function syncAdminPanel(): void {
@@ -501,6 +579,27 @@ function syncAdminPanel(): void {
   setSettingsFormEnabled(Boolean(device));
   adminBattery.textContent = device ? formatBattery(device) : t("admin.noDevice");
   updateSettingsSummary(device);
+  syncPasswordPanel();
+}
+
+async function ensureConnectedToDevice(device: DeviceRecord): Promise<DeviceRecord> {
+  if (client.connected && client.connectedDeviceId === device.id) {
+    return device;
+  }
+  if (client.connected) {
+    await client.disconnect();
+  }
+
+  const info = await client.connect({ namePrefix: device.name || readSearchPrefix() });
+  connectedDeviceName = info.deviceName;
+  const connectedDevice = upsertDevice({
+    ...device,
+    id: info.deviceId,
+    name: info.deviceName,
+    lastConnectedAt: Date.now(),
+  });
+  selectAdminDevice(connectedDevice.id);
+  return connectedDevice;
 }
 
 function selectAdminDevice(deviceId: string): void {
@@ -609,8 +708,9 @@ function saveSearchPrefix(namePrefix: string): void {
   localStorage.setItem(SEARCH_PREFIX_KEY, namePrefix);
 }
 
-function setView(view: "control" | "admin"): void {
+function setView(view: "control" | "addDevice" | "admin"): void {
   controlView.classList.toggle("hidden", view !== "control");
+  addDeviceView.classList.toggle("hidden", view !== "addDevice");
   adminView.classList.toggle("hidden", view !== "admin");
 }
 
@@ -635,9 +735,25 @@ function setSettingsFormEnabled(enabled: boolean): void {
   byId<HTMLInputElement>("waitTime").disabled = !enabled;
   byId<HTMLInputElement>("closeTime").disabled = !enabled;
   byId<HTMLInputElement>("reverse").disabled = !enabled;
+  byId<HTMLInputElement>("oldPassword").disabled = !enabled;
+  byId<HTMLInputElement>("newPassword").disabled = !enabled;
+  byId<HTMLInputElement>("confirmPassword").disabled = !enabled;
   saveSettingsButton.disabled = !enabled;
   resetSettingsButton.disabled = !enabled;
   deleteDeviceButton.disabled = !enabled;
+  revealPasswordPanelButton.disabled = !enabled;
+  changePasswordButton.disabled = !enabled;
+}
+
+function clearPasswordChangeForm(): void {
+  byId<HTMLInputElement>("oldPassword").value = "";
+  byId<HTMLInputElement>("newPassword").value = "";
+  byId<HTMLInputElement>("confirmPassword").value = "";
+}
+
+function syncPasswordPanel(): void {
+  const enabled = Boolean(getSelectedAdminDevice());
+  passwordPanel.classList.toggle("hidden", !enabled || !isPasswordPanelOpen);
 }
 
 function normalizeSettings(settings: Partial<Settings>): Settings {

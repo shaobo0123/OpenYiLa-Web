@@ -19,6 +19,12 @@ export type UnlockOptions = {
   timestampSeconds?: number;
 };
 
+export type ChangePasswordOptions = {
+  oldPassword: string;
+  newPassword: string;
+  timestampSeconds?: number;
+};
+
 export type DeviceResponse = {
   success: boolean;
   batteryLevel?: number;
@@ -36,6 +42,26 @@ export function buildOpenCommand(options: UnlockOptions): Uint8Array {
   const payload = `A:OPEN;P:${direction} ${options.openTimeMs},${options.waitTimeMs},${options.closeTimeMs};`;
   const plaintext = `${timestamp}${passwordKey}${payload}`;
   return aes128EcbEncryptZeroPadded(utf8Bytes(plaintext), OUTER_AES_KEY);
+}
+
+export function buildChangePasswordCommand(options: ChangePasswordOptions): Uint8Array {
+  if (!/^\d{6}$/.test(options.oldPassword)) {
+    throw new Error("Old password must be exactly 6 digits.");
+  }
+  if (!/^\d{6}$/.test(options.newPassword)) {
+    throw new Error("New password must be exactly 6 digits.");
+  }
+
+  const timestamp = options.timestampSeconds ?? Math.floor(Date.now() / 1000);
+  const oldPasswordKey = md5Hex(options.oldPassword).slice(8, 24);
+  const newPasswordKey = md5Hex(options.newPassword).slice(8, 24);
+  const payload = `A:PW;P:${newPasswordKey};`;
+  const plaintext = `${timestamp}${oldPasswordKey}${payload}`;
+  return aes128EcbEncryptZeroPadded(utf8Bytes(plaintext), OUTER_AES_KEY);
+}
+
+export function buildInitPasswordCommand(options: ChangePasswordOptions): Uint8Array {
+  return buildChangePasswordCommand(options);
 }
 
 export function parseDeviceResponse(data: Uint8Array): DeviceResponse {

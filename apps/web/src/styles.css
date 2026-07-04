@@ -228,10 +228,37 @@ button:disabled {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.password-panel {
+  display: grid;
+  gap: 14px;
+  border-top: 1px solid #d7e2dc;
+  padding-top: 18px;
+}
+
+.password-panel h3 {
+  margin: 0;
+  color: #24563a;
+  font-size: 1.05rem;
+}
+
+.password-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.password-button {
+  justify-self: start;
+  min-width: 150px;
+}
+
 .control-layout {
   display: grid;
   gap: 18px;
   align-items: stretch;
+}
+
+.add-device-view {
+  display: grid;
+  gap: 18px;
 }
 
 .devices-heading {
@@ -266,6 +293,10 @@ button:disabled {
   min-height: 150px;
   display: grid;
   gap: 12px;
+}
+
+.device-list:empty {
+  min-height: 0;
 }
 
 .device-card {
@@ -451,6 +482,10 @@ button:disabled {
 
   .field-grid {
     grid-template-columns: 1fr;
+  }
+
+  .password-button {
+    width: 100%;
   }
 
   .add-device-panel {
