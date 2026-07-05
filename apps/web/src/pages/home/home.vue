@@ -21,7 +21,7 @@
         v-for="device in devices"
         :key="device.id"
         :device="device"
-        :connected="connectedDeviceId === device.id"
+        :discovered="discoveredIds.has(device.id)"
         @session-change="refresh"
         @notify="onNotify"
       />
@@ -47,7 +47,8 @@ import { onShow } from "@dcloudio/uni-app";
 const { t } = useI18n();
 
 const devices = ref<DeviceRecord[]>([]);
-const connectedDeviceId = ref<string | null>(null);
+// 本轮扫描发现的设备 id 集合（用于卡片小圆点：绿=在附近，灰=不在）
+const discoveredIds = ref<Set<string>>(new Set());
 
 const bleSupported = ref(true);
 const shellPaddingTop = ref("48rpx");
@@ -69,10 +70,25 @@ onShow(() => {
   refresh();
 });
 
-/** 重新读取设备列表与当前连接状态 */
+/** 重新读取设备列表，并扫一轮判断哪些设备在附近 */
 function refresh(): void {
   devices.value = readDevices();
-  connectedDeviceId.value = getBleClient().connectedDeviceId;
+  // 按所有已绑定设备的 name 去重作为扫描前缀，扫一轮点亮"已发现"小圆点
+  const prefixes = Array.from(new Set(devices.value.map((d) => d.name).filter(Boolean)));
+  if (prefixes.length === 0) {
+    discoveredIds.value = new Set();
+    return;
+  }
+  // 先清空，扫描期间小圆点按最新结果点亮
+  discoveredIds.value = new Set();
+  void getBleClient()
+    .discoverOnce(prefixes)
+    .then((ids) => {
+      discoveredIds.value = ids;
+    })
+    .catch(() => {
+      // 扫描失败保持空集合，小圆点全灰
+    });
 }
 
 /** 检测当前端是否支持蓝牙（仅 H5 真正需要探测） */

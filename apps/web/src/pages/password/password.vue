@@ -95,8 +95,15 @@ async function onChangePassword(form: {
       });
     });
 
-    // 顺带回写一下电量
-    if (response.batteryLevel) {
+    // 改密成功：把新密码同步写回设备记录，保证一键开锁自动用新密码；
+    // 同时顺带回写一下电量
+    if (response.success) {
+      device.value = upsertDevice({
+        ...device.value!,
+        password: form.newPassword,
+        ...(response.batteryLevel ? { batteryLevel: response.batteryLevel } : {}),
+      });
+    } else if (response.batteryLevel) {
       device.value = upsertDevice({ ...device.value!, batteryLevel: response.batteryLevel });
     }
 

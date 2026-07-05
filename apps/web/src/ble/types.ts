@@ -27,6 +27,14 @@ export interface YilaBleClient {
 
   /** 断开连接，释放资源 */
   disconnect(options?: DisconnectOptions): Promise<void>;
+
+  /**
+   * 扫描一轮（只扫描不连接），返回这轮发现的、名称匹配任一前缀的设备 id 集合。
+   * 用于在列表/管理页判断设备是否在附近（点亮"已发现"小圆点）。
+   * 扫满 timeoutMs 或失败都自动停止，不抛错（失败时返回空集合）。
+   * H5 端 Web Bluetooth 无法静默扫描，固定返回空集合。
+   */
+  discoverOnce(namePrefixes: string[], timeoutMs?: number): Promise<Set<string>>;
 }
 
 export type ConnectOptions = {

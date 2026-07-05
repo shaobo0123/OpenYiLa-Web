@@ -7,7 +7,7 @@
           <view class="device-title">
             <text class="device-name">{{ device.name }}</text>
             <view class="tag-row">
-              <view class="status-dot" :class="connected ? 'status-dot--on' : 'status-dot--off'" />
+              <view class="status-dot" :class="discovered ? 'status-dot--on' : 'status-dot--off'" />
               <wd-tag round>{{ batteryText }}</wd-tag>
             </view>
           </view>
@@ -92,7 +92,8 @@ const { t } = useI18n();
 
 const deviceId = ref("");
 const device = ref<DeviceRecord | null>(null);
-const connected = ref(false);
+// 当前设备是否已被扫描发现（在附近），驱动小圆点
+const discovered = ref(false);
 
 // 当前正在进行的操作类型：'save' | 'password' | 'delete' | null，用于按钮 loading 态
 const busyKind = ref<"save" | "password" | "delete" | null>(null);
@@ -122,12 +123,28 @@ onShow(() => {
   refresh();
 });
 
-/** 重新从本地存储读取当前设备记录与连接状态 */
+/** 重新从本地存储读取当前设备记录，并扫一轮判断设备是否在附近 */
 function refresh(): void {
   device.value = deviceId.value ? findDevice(deviceId.value) : null;
-  connected.value = getBleClient().connectedDeviceId === deviceId.value;
   // 同步密码表单为当前设备记录里的密码
   passwordForm.value = device.value?.password ?? "";
+  // 扫一轮点亮"已发现"小圆点
+  discoverCurrent();
+}
+
+/** 扫描判断当前设备是否在附近 */
+function discoverCurrent(): void {
+  const name = device.value?.name;
+  discovered.value = false;
+  if (!name) return;
+  void getBleClient()
+    .discoverOnce([name])
+    .then((ids) => {
+      discovered.value = ids.has(deviceId.value);
+    })
+    .catch(() => {
+      // 扫描失败保持灰点
+    });
 }
 
 function readRouteDeviceId(query: Record<string, unknown> | undefined): string {
@@ -300,7 +317,7 @@ async function onDelete(): Promise<void> {
   gap: 12rpx;
 }
 
-/* 连接状态小圆点：绿=蓝牙已连，灰=未连接 */
+/* 发现状态小圆点：绿=设备在附近，灰=未发现 */
 .status-dot {
   width: 16rpx;
   height: 16rpx;

@@ -265,6 +265,52 @@ export class BleUniClient implements YilaBleClient {
     this.notificationReady = false;
   }
 
+  async discoverOnce(namePrefixes: string[], timeoutMs = DEFAULT_SCAN_TIMEOUT_MS): Promise<Set<string>> {
+    const prefixes = namePrefixes.filter(Boolean);
+    const found = new Set<string>();
+    if (prefixes.length === 0) {
+      return found;
+    }
+
+    // 必须先打开蓝牙适配器，否则 startBluetoothDevicesDiscovery 会静默失败（收不到任何设备）
+    try {
+      await callUni("openBluetoothAdapter");
+    } catch {
+      return found;
+    }
+
+    // 收集满 timeoutMs 的发现在范围内设备
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        offBluetoothDeviceFound(onFound);
+        void stopDiscoveryQuietly();
+        resolve();
+      };
+
+      const onFound = (event: UniBleDevice | { devices?: UniBleDevice[] }) => {
+        for (const device of normalizeFoundDevices(event)) {
+          const name = device.localName || device.name || "";
+          if (device.deviceId && prefixes.some((p) => name.startsWith(p))) {
+            found.add(device.deviceId);
+          }
+        }
+      };
+
+      const timer = setTimeout(finish, timeoutMs);
+
+      onBluetoothDeviceFound(onFound);
+      callUni("startBluetoothDevicesDiscovery", {
+        allowDuplicatesKey: true,
+        interval: 0,
+      }).catch(() => finish());
+    });
+    return found;
+  }
+
   async open(options: UnlockOptions, timeoutMs = DEFAULT_RESPONSE_TIMEOUT_MS): Promise<DeviceResponse> {
     return this.writeCommand(buildOpenCommand(options), timeoutMs);
   }

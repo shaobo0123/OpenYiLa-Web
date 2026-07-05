@@ -4,7 +4,7 @@
       <view class="device-title">
         <text class="device-name">{{ device.name }}</text>
         <view class="tag-row">
-          <view class="status-dot" :class="connected ? 'status-dot--on' : 'status-dot--off'" />
+          <view class="status-dot" :class="discovered ? 'status-dot--on' : 'status-dot--off'" />
           <wd-tag round>{{ batteryText }}</wd-tag>
         </view>
       </view>
@@ -22,7 +22,8 @@
 
 <script setup lang="ts">
 /**
- * 设备主卡片（首页）：展示设备名/连接状态/电量，并提供一键开锁入口。
+ * 设备主卡片（首页）：展示设备名/发现状态/电量，并提供一键开锁入口。
+ * 小圆点由父组件的扫描结果驱动：绿=设备在附近，灰=未发现。
  * 点击一键开锁直接用设备里配置好的密码开锁（默认 123456，可在管理页修改）。
  */
 import { ref, computed } from "vue";
@@ -36,7 +37,8 @@ const { t } = useI18n();
 
 const props = defineProps<{
   device: DeviceRecord;
-  connected: boolean;
+  /** 设备是否已被扫描发现（在附近）：绿点=在，灰点=不在 */
+  discovered: boolean;
 }>();
 
 const emit = defineEmits<{

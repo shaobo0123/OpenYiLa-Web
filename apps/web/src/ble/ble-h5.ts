@@ -121,6 +121,12 @@ export class BleH5Client implements YilaBleClient {
     return this.writeCommand(buildChangePasswordCommand(options), timeoutMs);
   }
 
+  async discoverOnce(_namePrefixes: string[], _timeoutMs?: number): Promise<Set<string>> {
+    // H5 端 Web Bluetooth 无法静默扫描（requestDevice 必须弹系统选择器且需用户手势），
+    // 固定返回空集合——H5 下"是否在附近"由 connect/open 时的实际交互体现。
+    return new Set();
+  }
+
   /** 写入一条加密命令，并等待 RX 通知的应答（带超时） */
   private async writeCommand(command: Uint8Array, timeoutMs: number): Promise<DeviceResponse> {
     if (!this.tx || !this.rx) {
