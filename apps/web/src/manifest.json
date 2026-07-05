@@ -6,17 +6,7 @@
   "versionCode": "100",
   "transformPx": false,
   "h5": {},
-  "mp-weixin": {
-    "requiredPrivateInfos": [
-      "openBluetoothAdapter",
-      "startBluetoothDevicesDiscovery",
-      "onBluetoothDeviceFound",
-      "getBluetoothDevices",
-      "getConnectedBluetoothDevices",
-      "getBLEDeviceServices",
-      "getBLEDeviceCharacteristics"
-    ]
-  },
+  "mp-weixin": {},
   "app-plus": {
     "distribute": {
       "android": {
