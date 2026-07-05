@@ -216,3 +216,49 @@ export function setLocale(locale: Locale): void {
 export function getLocale(): Locale {
   return i18n.global.locale.value as Locale;
 }
+
+/**
+ * 兼容性插值翻译。
+ *
+ * 优先走 vue-i18n 原生 `t`（小程序运行时下 message compiler 缺失，含 `{x}` 的消息会
+ * 原样返回 "{name} 已删除"）；用检测到的字面量兜底：从 messages 里按 key 路径取出
+ * 原始模板，手动把 `{name}` 这类占位符替换成入参里对应的值，再降级返回 key 自身。
+ *
+ * 仅用于「带占位符」的少量提示文案（如删除提示、连接提示），其余无占位符的翻译
+ * 仍可直接用 `t("...")`，性能与原方案一致。
+ */
+export function tt(key: string, params?: Record<string, string | number>): string {
+  const global = i18n.global;
+  const translated = params
+    ? global.t(key, params as Record<string, unknown>)
+    : global.t(key);
+  // vue-i18n 命中且完成插值时不会残留 "{...}" 占位符；检测到残留即认为编译器缺失
+  if (translated && !/\{[\w]+\}/.test(translated)) {
+    return translated;
+  }
+
+  const template = resolveTemplate(messages[getLocale()], key) || resolveTemplate(messages["zh-CN"], key);
+  if (!template) {
+    return translated || key;
+  }
+  if (!params) {
+    return template;
+  }
+  return template.replace(/\{(\w+)\}/g, (_, name: string) =>
+    name in params ? String(params[name]) : `{${name}}`,
+  );
+}
+
+/** 按 `a.b.c` 路径从 locale messages 中取出原始字符串模板 */
+function resolveTemplate(root: unknown, dottedKey: string): string | undefined {
+  const segments = dottedKey.split(".");
+  let node: unknown = root;
+  for (const segment of segments) {
+    if (node && typeof node === "object" && segment in (node as Record<string, unknown>)) {
+      node = (node as Record<string, unknown>)[segment];
+    } else {
+      return undefined;
+    }
+  }
+  return typeof node === "string" ? node : undefined;
+}

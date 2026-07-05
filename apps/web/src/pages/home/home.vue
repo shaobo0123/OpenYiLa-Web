@@ -57,6 +57,7 @@ import DeviceCardHero from "../../components/DeviceCardHero.vue";
 import UnlockSheet from "../../components/UnlockSheet.vue";
 import { getBleClient } from "../../ble";
 import { readDevices, upsertDevice, type DeviceRecord } from "../../state/devices";
+import { tt } from "../../i18n";
 import { onShow } from "@dcloudio/uni-app";
 
 const { t } = useI18n();
@@ -190,7 +191,7 @@ async function onUnlockConfirm(password: string): Promise<void> {
 function formatDeviceMeta(device: DeviceRecord): string {
   const dir = device.settings.reverse ? t("admin.reverseOn") : t("admin.reverseOff");
   const bat = device.batteryLevel
-    ? t("status.battery", { level: device.batteryLevel })
+    ? tt("status.battery", { level: device.batteryLevel })
     : t("device.batteryUnknown");
   return `${dir} · ${bat}`;
 }

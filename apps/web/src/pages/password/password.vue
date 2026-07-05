@@ -34,8 +34,9 @@ import { onLoad } from "@dcloudio/uni-app";
 import PageNav from "../../components/PageNav.vue";
 import PasswordPanel from "../../components/PasswordPanel.vue";
 import { getBleClient } from "../../ble";
-import { ensureConnectedToDevice, errorMessage } from "../../ble/helpers";
+import { errorMessage, withDeviceConnection } from "../../ble/helpers";
 import { findDevice, upsertDevice, type DeviceRecord } from "../../state/devices";
+import { tt } from "../../i18n";
 
 const { t } = useI18n();
 
@@ -86,21 +87,22 @@ async function onChangePassword(form: {
   busy.value = true;
   isError.value = false;
   try {
-    // 连接设备（必要时重连），再下发改密命令
-    const target = await ensureConnectedToDevice(device.value);
-    const response = await getBleClient().changePassword({
-      oldPassword: form.oldPassword,
-      newPassword: form.newPassword,
+    // 按需连接：连上 → 下发改密命令 → 自动断开
+    const response = await withDeviceConnection(device.value!, async () => {
+      return getBleClient().changePassword({
+        oldPassword: form.oldPassword,
+        newPassword: form.newPassword,
+      });
     });
 
     // 顺带回写一下电量
     if (response.batteryLevel) {
-      device.value = upsertDevice({ ...target, batteryLevel: response.batteryLevel });
+      device.value = upsertDevice({ ...device.value!, batteryLevel: response.batteryLevel });
     }
 
     message.value = response.success
       ? t("status.passwordChangeSuccess")
-      : t("status.passwordChangeFailed", { message: response.message });
+      : tt("status.passwordChangeFailed", { message: response.message });
     isError.value = !response.success;
 
     if (response.success) {

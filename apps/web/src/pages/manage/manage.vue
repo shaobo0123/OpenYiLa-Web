@@ -58,6 +58,7 @@ import PageNav from "../../components/PageNav.vue";
 import TimingPanel from "../../components/TimingPanel.vue";
 import { getBleClient } from "../../ble";
 import { errorMessage, confirmDialog } from "../../ble/helpers";
+import { tt } from "../../i18n";
 import {
   findDevice,
   updateDeviceSettings,
@@ -83,7 +84,7 @@ const deleteError = ref(false);
 
 const batteryText = computed(() =>
   device.value?.batteryLevel
-    ? t("status.battery", { level: device.value.batteryLevel })
+    ? tt("status.battery", { level: device.value.batteryLevel })
     : t("device.batteryUnknown"),
 );
 
@@ -127,7 +128,7 @@ async function onSaveTiming(settings: Settings): Promise<void> {
       timingError.value = true;
       return;
     }
-    timingMessage.value = t("admin.savedFor", { name: updated.name });
+    timingMessage.value = tt("admin.savedFor", { name: updated.name });
     device.value = updated;
     uni.showToast({ title: timingMessage.value, icon: "success" });
   } finally {
@@ -140,7 +141,7 @@ function onResetTiming(): void {
   if (!device.value) return;
   const updated = updateDeviceSettings(device.value.id, DEFAULT_SETTINGS);
   if (updated) {
-    timingMessage.value = t("admin.resetDoneFor", { name: updated.name });
+    timingMessage.value = tt("admin.resetDoneFor", { name: updated.name });
     timingError.value = false;
     device.value = updated;
     uni.showToast({ title: timingMessage.value, icon: "success" });
@@ -154,18 +155,27 @@ function goPassword(): void {
   });
 }
 
-/** 删除设备：二次确认后从本地存储移除，并返回上一页 */
+/** 删除设备：二次确认后断开 BLE、从本地存储移除，并返回上一页 */
 async function onDelete(): Promise<void> {
   if (!device.value) return;
-  const confirmed = await confirmDialog(t("device.deleteConfirm", { name: device.value.name }));
+  const confirmed = await confirmDialog(tt("device.deleteConfirm", { name: device.value.name }));
   if (!confirmed) return;
 
   busyKind.value = "delete";
   try {
+    // 先把蓝牙断开：单例客户端若仍连着这台设备，会导致后续无法重新添加
+    // （小程序端 createBLEConnection 对已连接的 deviceId 会直接报错）
+    const client = getBleClient();
+    if (client.connectedDeviceId === device.value.id) {
+      await client.disconnect().catch(() => {
+        // 设备可能已自行断开，忽略
+      });
+    }
     deleteDeviceRecord(device.value.id);
-    deleteMessage.value = t("device.deleted", { name: device.value.name });
+    const message = tt("device.deleted", { name: device.value.name });
+    deleteMessage.value = message;
     deleteError.value = false;
-    uni.showToast({ title: deleteMessage.value, icon: "success" });
+    uni.showToast({ title: message, icon: "success" });
     setTimeout(() => {
       uni.navigateBack({ delta: 1 });
     }, 600);

@@ -25,6 +25,18 @@ const BLE_REQUEST_MTU = 128;
 /** 两次分片写入之间的间隔（毫秒），给设备留处理时间 */
 const BLE_WRITE_CHUNK_DELAY_MS = 30;
 /**
+ * 停止扫描到发起 GATT 连接之间的缓冲（毫秒）。
+ * 微信 Android 在系统扫描未真正停下时 createBLEConnection 会高频返回 status 133，
+ * 这里留出一段 settle 时间规避该竞态。
+ */
+const BLE_STOP_DISCOVERY_SETTLE_MS = 300;
+/** 微信 createBLEConnection 的 GATT 133 错误码，常见为一次性失败，需自动重试 */
+const BLE_GATT_ERROR_133 = 133;
+/** 微信 createBLEConnection 的 10003 错误码（CONNECTION FAIL / 连接已存在），同样常见为一次性 */
+const BLE_GATT_ERROR_10003 = 10003;
+/** 133 重试前的退避（毫秒） */
+const BLE_GATT_133_RETRY_DELAY_MS = 400;
+/**
  * setBLEMTU 失败时的默认单次写入上限（对应常见协商 MTU 247 − 3 ATT 头）。
  *
  * 关键：YiLa 设备把每次 writeBLECharacteristicValue 当作一条独立命令解析，
@@ -129,16 +141,12 @@ export class BleUniClient implements YilaBleClient {
     // 2) 扫描并匹配到目标设备
     const device = await this.scanForDevice(namePrefix);
     await stopDiscoveryQuietly();
+    // 停止扫描到 createBLEConnection 之间必须留出缓冲：微信 Android 端在系统扫描
+    // 真正停下来前发起 GATT 连接会高频返回 status 133（GATT_ERROR）。
+    await delay(BLE_STOP_DISCOVERY_SETTLE_MS);
 
-    // 3) 建立 GATT 连接
-    await withTimeout(
-      callUni("createBLEConnection", {
-        deviceId: device.deviceId,
-        timeout: connectTimeoutMs,
-      }),
-      connectTimeoutMs,
-      "蓝牙连接超时。",
-    );
+    // 3) 建立 GATT 连接。status 133 常见为一次性失败，最多重试一次。
+    await this.createConnectionWithRetry(device.deviceId, connectTimeoutMs);
 
     this.maxWriteBytes = BLE_DEFAULT_MAX_WRITE_BYTES;
     // 尝试确认系统已协商的 MTU（仅部分 Android 支持 setBLEMTU；失败不影响整包写入）
@@ -189,6 +197,35 @@ export class BleUniClient implements YilaBleClient {
       deviceName: this.deviceName,
       deviceId: this.deviceId,
     };
+  }
+
+  /**
+   * 发起 GATT 连接，对一次性连接错误（133 GATT_ERROR / 10003 CONNECTION FAIL）自动重试一次。
+   * 这两个码多见于扫描未完全停止、上一次连接未释放干净、设备正忙等一次性场景，
+   * 退避 + 清理残留连接后重试通常即可成功。
+   */
+  private async createConnectionWithRetry(deviceId: string, connectTimeoutMs: number): Promise<void> {
+    try {
+      await withTimeout(
+        callUni("createBLEConnection", { deviceId, timeout: connectTimeoutMs }),
+        connectTimeoutMs,
+        "蓝牙连接超时。",
+      );
+    } catch (error) {
+      if (!isTransientGattError(error)) {
+        throw error;
+      }
+      // 退避后再来一次：先尝试关掉可能残留的连接，再等一段时间
+      await callUni("closeBLEConnection", { deviceId }).catch(() => {
+        // 残留连接本就没建立，忽略
+      });
+      await delay(BLE_GATT_133_RETRY_DELAY_MS);
+      await withTimeout(
+        callUni("createBLEConnection", { deviceId, timeout: connectTimeoutMs }),
+        connectTimeoutMs,
+        "蓝牙连接超时。",
+      );
+    }
   }
 
   async disconnect(options: DisconnectOptions = {}): Promise<void> {
@@ -283,7 +320,9 @@ export class BleUniClient implements YilaBleClient {
 
       onBluetoothDeviceFound(onFound);
       callUni("startBluetoothDevicesDiscovery", {
-        allowDuplicatesKey: false,
+        // allowDuplicatesKey 必须为 true：微信在单个适配器会话内默认对每个设备只上报一次，
+        // 第二次扫描（如开锁/改密）会因设备已被"发现过"而不再回调，导致扫不到。
+        allowDuplicatesKey: true,
         interval: 0,
       }).catch((error: unknown) => {
         finish(undefined, error instanceof Error ? error : new Error(String(error)));
@@ -476,7 +515,10 @@ function callUni<T = UniCallbackResult>(
       ...options,
       success: (result: T) => resolve(result),
       fail: (error: UniCallbackResult) => {
-        reject(new Error(formatUniError(method, error, fallbackMessage)));
+        const wrapped = new Error(formatUniError(method, error, fallbackMessage));
+        // 附带原始 errCode，便于上层按 133 等具体码识别并重试
+        (wrapped as Error & { errCode?: number }).errCode = error.errCode;
+        reject(wrapped);
       },
     });
   });
@@ -568,13 +610,32 @@ function delay(timeoutMs: number): Promise<void> {
   });
 }
 
-/** 拼装 uni API 的错误信息：优先 fallbackMessage + 平台 detail */
+/** 拼装 uni API 的错误信息：优先 fallbackMessage + 平台 detail，errCode 始终带上（便于上层识别 133 等） */
 function formatUniError(method: string, error: UniCallbackResult, fallbackMessage?: string): string {
-  const detail = error.errMsg || (error.errCode === undefined ? "" : `errCode: ${error.errCode}`);
+  const parts: string[] = [];
+  if (error.errMsg) {
+    parts.push(error.errMsg);
+  }
+  if (error.errCode !== undefined) {
+    parts.push(`errCode: ${error.errCode}`);
+  }
+  const detail = parts.join(" | ");
   if (!detail) {
     return fallbackMessage || `${method} failed.`;
   }
   return fallbackMessage ? `${fallbackMessage} (${detail})` : detail;
+}
+
+/** 判断错误是否为微信 BLE 的一次性连接错误（133 GATT_ERROR / 10003 CONNECTION FAIL） */
+function isTransientGattError(error: unknown): boolean {
+  const code =
+    error && typeof error === "object" && "errCode" in error
+      ? (error as UniCallbackResult).errCode
+      : undefined;
+  if (code === BLE_GATT_ERROR_133 || code === BLE_GATT_ERROR_10003) {
+    return true;
+  }
+  return error instanceof Error && /errCode:\s*(133|10003)\b/.test(error.message);
 }
 
 /** 任意错误对象 → 字符串 */

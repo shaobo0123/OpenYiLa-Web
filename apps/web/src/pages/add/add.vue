@@ -33,6 +33,7 @@ import { useI18n } from "vue-i18n";
 import PageNav from "../../components/PageNav.vue";
 import { getBleClient } from "../../ble";
 import { errorMessage } from "../../ble/helpers";
+import { DEFAULT_DISCONNECT_DELAY_MS } from "@openyila/core";
 import {
   readSearchPrefix,
   saveSearchPrefix,
@@ -61,14 +62,20 @@ async function onSearch(): Promise<void> {
   busy.value = true;
   isError.value = false;
   message.value = t("status.searching");
+  const client = getBleClient();
   try {
-    const client = getBleClient();
     const info = await client.connect({ namePrefix: prefix });
     upsertDevice({
       id: info.deviceId,
       name: info.deviceName,
       lastConnectedAt: Date.now(),
     });
+    // 添加只需确认是合法 YiLa 设备，连上即断开，不长期占用 GATT
+    await client
+      .disconnect({ delayMs: DEFAULT_DISCONNECT_DELAY_MS })
+      .catch(() => {
+        // 设备可能已自行断开，忽略
+      });
     message.value = t("device.addedDone");
     isError.value = false;
     uni.showToast({ title: t("device.addedDone"), icon: "success" });

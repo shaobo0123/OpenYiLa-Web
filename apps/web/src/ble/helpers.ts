@@ -34,6 +34,34 @@ export async function ensureConnectedToDevice(device: DeviceRecord): Promise<Dev
   });
 }
 
+/**
+ * 「按需连接」：连上目标设备 → 执行任务 → 自动断开。
+ *
+ * 蓝牙门锁不需要常连，只在开锁 / 改密 / 添加等操作时短暂连接，操作完即断，
+ * 释放 GATT 资源、避免占用设备。`task` 抛错也会保证断开。
+ *
+ * @returns task 的返回值
+ */
+export async function withDeviceConnection<T>(
+  device: DeviceRecord,
+  task: (device: DeviceRecord) => Promise<T>,
+): Promise<T> {
+  const client = getBleClient();
+  const wasConnected = client.connected && client.connectedDeviceId === device.id;
+  const target = await ensureConnectedToDevice(device);
+  try {
+    return await task(target);
+  } finally {
+    // 之前就已经连着这台设备（理论上不会发生，按需连接下都是新连）则保持原状；
+    // 否则操作完就断开。
+    if (!wasConnected) {
+      await client.disconnect().catch(() => {
+        // 设备可能已自行断开，忽略
+      });
+    }
+  }
+}
+
 /** 把任意错误对象转换成可读字符串 */
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

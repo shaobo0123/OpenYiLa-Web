@@ -30,8 +30,9 @@
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { getBleClient } from "../ble";
-import { ensureConnectedToDevice, errorMessage } from "../ble/helpers";
+import { errorMessage, withDeviceConnection } from "../ble/helpers";
 import { upsertDevice, type DeviceRecord } from "../state/devices";
+import { tt } from "../i18n";
 
 const { t } = useI18n();
 
@@ -53,7 +54,7 @@ const busy = ref(false);
 
 const batteryText = computed(() =>
   props.device.batteryLevel
-    ? t("status.battery", { level: props.device.batteryLevel })
+    ? tt("status.battery", { level: props.device.batteryLevel })
     : t("device.batteryUnknown"),
 );
 
@@ -86,31 +87,31 @@ async function doUnlock(password: string): Promise<void> {
   }
   busy.value = true;
   try {
-    // 1) 确保连到目标设备（必要时断开当前连接并重连）
-    const target = await ensureConnectedToDevice(props.device);
-    const client = getBleClient();
-    // 2) 下发开锁命令，时序参数取自设备设置
-    const response = await client.open({
-      password,
-      openTimeMs: target.settings.openTimeMs,
-      waitTimeMs: target.settings.waitTimeMs,
-      closeTimeMs: target.settings.closeTimeMs,
-      reverse: target.settings.reverse,
+    // 按需连接：连上 → 下发开锁命令 → 自动断开，不长期占用 GATT
+    const response = await withDeviceConnection(props.device, async (target) => {
+      const client = getBleClient();
+      return client.open({
+        password,
+        openTimeMs: target.settings.openTimeMs,
+        waitTimeMs: target.settings.waitTimeMs,
+        closeTimeMs: target.settings.closeTimeMs,
+        reverse: target.settings.reverse,
+      });
     });
 
-    // 3) 回写最近开锁时间 + 电量
+    // 回写最近开锁时间 + 电量（基于连接时拿到的最新设备记录）
     upsertDevice({
-      ...target,
+      ...props.device,
       lastOpenedAt: Date.now(),
       ...(response.batteryLevel ? { batteryLevel: response.batteryLevel } : {}),
     });
 
-    // 4) 通知父组件展示结果并刷新
+    // 通知父组件展示结果并刷新
     const msg = response.success
       ? t("status.unlockSuccess")
-      : t("status.unlockFailed", { message: response.message });
+      : tt("status.unlockFailed", { message: response.message });
     const suffix = response.batteryLevel
-      ? ` · ${t("status.battery", { level: response.batteryLevel })}`
+      ? ` · ${tt("status.battery", { level: response.batteryLevel })}`
       : "";
     emit("notify", msg + suffix, !response.success);
     emit("sessionChange");
