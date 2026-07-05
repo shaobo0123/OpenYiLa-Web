@@ -43,6 +43,10 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 开锁时序设置面板：开锁/等待/关锁时长 + 反向开关。
+ * 时间值在输入时即钳制到 0-10000ms；提供「恢复默认」和「保存」两个动作。
+ */
 import { reactive, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { Settings } from "../state/devices";
@@ -61,8 +65,10 @@ const emit = defineEmits<{
   reset: [];
 }>();
 
+// 用初始 settings 拷贝一份本地可编辑副本
 const form = reactive<Settings>({ ...props.settings });
 
+// 顶部摘要：时长组合 + 方向
 const summary = computed(() => {
   const s = form;
   const dir = s.reverse ? t("admin.reverseOn") : t("admin.reverseOff");
@@ -72,6 +78,7 @@ const summary = computed(() => {
 function update(field: "openTimeMs" | "waitTimeMs" | "closeTimeMs", v: string): void {
   const num = Number(v);
   if (Number.isFinite(num)) {
+    // 与 state/devices 的 clampTime 保持一致：0-10000 整数
     form[field] = Math.min(10000, Math.max(0, Math.round(num)));
   }
 }

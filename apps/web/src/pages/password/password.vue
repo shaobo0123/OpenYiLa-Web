@@ -21,6 +21,10 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 修改密码页：校验表单后，连接设备并下发改密命令。
+ * 改密成功会清空表单并返回上一页。
+ */
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { onLoad } from "@dcloudio/uni-app";
@@ -36,6 +40,7 @@ const device = ref<DeviceRecord | null>(null);
 const busy = ref(false);
 const message = ref("");
 const isError = ref(false);
+// 用于改密成功后清空表单
 const passwordPanelRef = ref<InstanceType<typeof PasswordPanel> | null>(null);
 
 onLoad((query) => {
@@ -49,6 +54,7 @@ async function onChangePassword(form: {
   confirmPassword: string;
 }): Promise<void> {
   if (!device.value) return;
+  // 前置校验：6 位数字 + 两次新密码一致
   if (!/^\d{6}$/.test(form.oldPassword) || !/^\d{6}$/.test(form.newPassword)) {
     message.value = t("status.passwordInvalid");
     isError.value = true;
@@ -63,12 +69,14 @@ async function onChangePassword(form: {
   busy.value = true;
   isError.value = false;
   try {
+    // 连接设备（必要时重连），再下发改密命令
     const target = await ensureConnectedToDevice(device.value);
     const response = await getBleClient().changePassword({
       oldPassword: form.oldPassword,
       newPassword: form.newPassword,
     });
 
+    // 顺带回写一下电量
     if (response.batteryLevel) {
       device.value = upsertDevice({ ...target, batteryLevel: response.batteryLevel });
     }

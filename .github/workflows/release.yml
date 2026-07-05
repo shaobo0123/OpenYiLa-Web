@@ -4,11 +4,6 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "版本标签（不填则用 commit sha）"
-        required: false
 
 permissions:
   contents: write # 创建 Release 需要
@@ -57,7 +52,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          tag_name: ${{ github.ref_name }}
           generate_release_notes: true
           files: |
             ${{ runner.temp }}/openyila-mp-weixin.zip

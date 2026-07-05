@@ -12,6 +12,7 @@
 </template>
 
 <script setup lang="ts">
+/** 首页空状态：还没有任何设备时展示的引导卡片。 */
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 const emit = defineEmits<{ add: [] }>();

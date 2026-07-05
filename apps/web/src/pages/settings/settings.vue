@@ -26,6 +26,7 @@
 </template>
 
 <script setup lang="ts">
+/** 全局设置页：目前仅包含语言切换。 */
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { LOCALES, getLocale, setLocale, type Locale } from "../../i18n";
@@ -34,6 +35,7 @@ const { t } = useI18n();
 
 const currentLocale = ref<Locale>(getLocale());
 
+/** 选择某语言：切换 i18n 并持久化 */
 function onLocaleSelect(locale: Locale): void {
   setLocale(locale);
   currentLocale.value = locale;

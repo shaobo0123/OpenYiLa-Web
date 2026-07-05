@@ -46,6 +46,11 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 修改密码表单：旧/新/确认新密码三个输入框。
+ * 仅在三项都是 6 位数字且两次新密码一致时，提交按钮才可用。
+ * 通过 defineExpose 暴露 reset()，供父组件在改密成功后清空表单。
+ */
 import { reactive, computed } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -68,6 +73,7 @@ const form = reactive({
   confirmPassword: "",
 });
 
+// 提交就绪条件：三个密码都是 6 位数字 + 两次新密码一致
 const ready = computed(
   () =>
     /^\d{6}$/.test(form.oldPassword) &&

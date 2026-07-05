@@ -44,6 +44,12 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 首页：展示设备列表与开锁入口。
+ * - 空状态显示引导卡片；
+ * - 有设备时渲染 DeviceCardHero 列表；
+ * - 点击开锁弹出 UnlockSheet 输入密码，确认后调用对应卡片的 performUnlock。
+ */
 import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import EmptyState from "../../components/EmptyState.vue";
@@ -57,8 +63,10 @@ const { t } = useI18n();
 
 const devices = ref<DeviceRecord[]>([]);
 const connectedDeviceId = ref<string | null>(null);
+// 设备卡片组件实例列表，用于通过 ref 调用 performUnlock
 const deviceCardRefs = ref<InstanceType<typeof DeviceCardHero>[]>([]);
 
+// 开锁弹层的全部状态（合并到一个 ref 便于整体重置）
 const unlockSheet = ref({
   visible: false,
   deviceName: "",
@@ -79,15 +87,18 @@ onMounted(() => {
   checkBleSupport();
 });
 
+// 页面每次重新可见时刷新（从添加/管理页返回时也要刷新）
 onShow(() => {
   refresh();
 });
 
+/** 重新读取设备列表与当前连接状态 */
 function refresh(): void {
   devices.value = readDevices();
   connectedDeviceId.value = getBleClient().connectedDeviceId;
 }
 
+/** 检测当前端是否支持蓝牙（仅 H5 真正需要探测） */
 function checkBleSupport(): void {
   // #ifdef H5
   bleSupported.value = Boolean(navigator.bluetooth);
@@ -115,6 +126,7 @@ function goSettings(): void {
   uni.navigateTo({ url: "/pages/settings/settings" });
 }
 
+/** 用户点了某个卡片的「开锁」：弹出密码输入层 */
 function onRequestUnlock(device: DeviceRecord): void {
   unlockSheet.value = {
     visible: true,
@@ -131,6 +143,7 @@ function closeUnlockSheet(): void {
   unlockSheet.value.visible = false;
 }
 
+/** 密码确认：关掉弹层，找到对应卡片实例并调用其 performUnlock */
 async function onUnlockConfirm(password: string): Promise<void> {
   const deviceId = unlockSheet.value.deviceId;
   const card = deviceCardRefs.value.find(
@@ -148,6 +161,7 @@ async function onUnlockConfirm(password: string): Promise<void> {
   unlockSheet.value.busy = false;
 }
 
+/** 拼装开锁弹层右上角的元信息：方向 · 电量 */
 function formatDeviceMeta(device: DeviceRecord): string {
   const dir = device.settings.reverse ? t("admin.reverseOn") : t("admin.reverseOff");
   const bat = device.batteryLevel

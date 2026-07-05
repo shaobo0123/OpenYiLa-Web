@@ -23,6 +23,10 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 设备主卡片（首页）：展示设备名/连接状态/电量，并提供一键开锁入口。
+ * 开锁时先校验密码格式，再走 BLE 连接 → 下发开锁命令 → 回写设备状态。
+ */
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { getBleClient } from "../ble";
@@ -37,8 +41,11 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  /** 连接状态/电量发生变化，通知父组件刷新 */
   sessionChange: [];
+  /** 通知父组件弹 toast（含是否为错误） */
   notify: [message: string, isError: boolean];
+  /** 用户点了开锁按钮，请求父组件弹出密码输入面板 */
   requestUnlock: [device: DeviceRecord];
 }>();
 
@@ -61,6 +68,7 @@ async function onUnlockClick(): Promise<void> {
   emit("requestUnlock", props.device);
 }
 
+/** 供父组件通过 ref 调用：用给定密码执行开锁 */
 function performUnlock(password: string): void {
   void doUnlock(password);
 }
@@ -74,8 +82,10 @@ async function doUnlock(password: string): Promise<void> {
   }
   busy.value = true;
   try {
+    // 1) 确保连到目标设备（必要时断开当前连接并重连）
     const target = await ensureConnectedToDevice(props.device);
     const client = getBleClient();
+    // 2) 下发开锁命令，时序参数取自设备设置
     const response = await client.open({
       password,
       openTimeMs: target.settings.openTimeMs,
@@ -84,12 +94,14 @@ async function doUnlock(password: string): Promise<void> {
       reverse: target.settings.reverse,
     });
 
+    // 3) 回写最近开锁时间 + 电量
     upsertDevice({
       ...target,
       lastOpenedAt: Date.now(),
       ...(response.batteryLevel ? { batteryLevel: response.batteryLevel } : {}),
     });
 
+    // 4) 通知父组件展示结果并刷新
     const msg = response.success
       ? t("status.unlockSuccess")
       : t("status.unlockFailed", { message: response.message });

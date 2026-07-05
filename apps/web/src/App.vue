@@ -3,6 +3,7 @@
 </template>
 
 <style lang="scss">
+/* 全局根样式：覆盖 wot-design-uni 的主题色为 OpenYiLa 品牌绿，并设定页面底色与文字色。 */
 page {
   --wot-color-theme: #2e7d52;
   --wot-color-theme-light: #2e7d52;

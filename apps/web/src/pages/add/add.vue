@@ -21,6 +21,10 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 添加设备页：输入设备名前缀，搜索并连接到第一台匹配的 YiLa 设备。
+ * 连接成功后写入设备记录，提示后返回上一页。
+ */
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { getBleClient } from "../../ble";
@@ -34,6 +38,7 @@ import {
 
 const { t } = useI18n();
 
+// 默认填充上次保存的搜索前缀
 const namePrefix = ref(readSearchPrefix());
 const busy = ref(false);
 const message = ref("");
@@ -43,8 +48,10 @@ function onPrefixInput(v: string): void {
   namePrefix.value = v;
 }
 
+/** 触发搜索 + 连接：空前缀回退到默认设备名 */
 async function onSearch(): Promise<void> {
   const prefix = namePrefix.value.trim() || DEFAULT_DEVICE_NAME;
+  // 记住这次的前缀，作为下次默认值
   saveSearchPrefix(prefix);
 
   busy.value = true;
@@ -61,6 +68,7 @@ async function onSearch(): Promise<void> {
     message.value = t("device.addedDone");
     isError.value = false;
     uni.showToast({ title: t("device.addedDone"), icon: "success" });
+    // 短暂展示成功提示后返回首页
     setTimeout(() => {
       uni.navigateBack({ delta: 1 });
     }, 600);

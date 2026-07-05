@@ -39,6 +39,10 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 开锁密码输入弹层（底部 popup）。
+ * 每次打开会清空密码；密码满 6 位才允许确认。
+ */
 import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -61,6 +65,7 @@ const emit = defineEmits<{
 
 const password = ref("");
 
+// 弹层每次显示时清空密码，避免残留上一次输入
 watch(
   () => props.visible,
   (v) => {

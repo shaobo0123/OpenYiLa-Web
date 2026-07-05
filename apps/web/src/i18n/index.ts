@@ -1,12 +1,15 @@
 import { createI18n } from "vue-i18n";
 
+/** 支持的语言代码 */
 export type Locale = "zh-CN" | "en-US";
 
+/** 可选语言列表（用于设置页渲染按钮） */
 export const LOCALES: { value: Locale; label: string }[] = [
   { value: "zh-CN", label: "中文" },
   { value: "en-US", label: "English" },
 ];
 
+/** 本地存储 key：当前语言 */
 const LOCALE_STORAGE_KEY = "openyila.locale";
 
 const messages = {
@@ -179,10 +182,16 @@ const messages = {
   },
 };
 
+/** 类型守卫：判断任意值是否为受支持的 Locale */
 function isLocale(value: unknown): value is Locale {
   return LOCALES.some((locale) => locale.value === value);
 }
 
+/**
+ * 探测初始语言：
+ * 1) 优先读本地存储里用户上次的选择；
+ * 2) 否则按系统语言判断（中文 → zh-CN，其余 → en-US）。
+ */
 function detectLocale(): Locale {
   const stored = uni.getStorageSync(LOCALE_STORAGE_KEY);
   if (isLocale(stored)) return stored;
@@ -197,11 +206,13 @@ export const i18n = createI18n({
   messages,
 });
 
+/** 切换语言：同时更新 i18n 实例并持久化到本地存储 */
 export function setLocale(locale: Locale): void {
   i18n.global.locale.value = locale;
   uni.setStorageSync(LOCALE_STORAGE_KEY, locale);
 }
 
+/** 获取当前语言 */
 export function getLocale(): Locale {
   return i18n.global.locale.value as Locale;
 }

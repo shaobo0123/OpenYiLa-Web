@@ -44,6 +44,10 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 设备管理页：展示某台设备的概览，提供时序设置、改密入口和删除设备。
+ * 设备 id 通过页面 query 传入。
+ */
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { onLoad, onShow } from "@dcloudio/uni-app";
@@ -65,6 +69,7 @@ const deviceId = ref("");
 const device = ref<DeviceRecord | null>(null);
 const connected = ref(false);
 
+// 当前正在进行的操作类型：'save' | 'delete' | null，用于按钮 loading 态
 const busyKind = ref<"save" | "delete" | null>(null);
 
 const timingMessage = ref("");
@@ -87,11 +92,13 @@ onShow(() => {
   refresh();
 });
 
+/** 重新从本地存储读取当前设备记录与连接状态 */
 function refresh(): void {
   device.value = deviceId.value ? findDevice(deviceId.value) : null;
   connected.value = getBleClient().connectedDeviceId === deviceId.value;
 }
 
+/** 保存新的时序设置到本地存储 */
 async function onSaveTiming(settings: Settings): Promise<void> {
   if (!device.value) return;
   busyKind.value = "save";
@@ -111,6 +118,7 @@ async function onSaveTiming(settings: Settings): Promise<void> {
   }
 }
 
+/** 恢复默认时序设置 */
 function onResetTiming(): void {
   if (!device.value) return;
   const updated = updateDeviceSettings(device.value.id, DEFAULT_SETTINGS);
@@ -129,6 +137,7 @@ function goPassword(): void {
   });
 }
 
+/** 删除设备：二次确认后从本地存储移除，并返回上一页 */
 async function onDelete(): Promise<void> {
   if (!device.value) return;
   const confirmed = await confirmDialog(t("device.deleteConfirm", { name: device.value.name }));

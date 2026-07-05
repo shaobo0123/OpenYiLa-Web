@@ -2,10 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
-  pull_request:
+    tags:
+      - "v*"
 
-# 同一分支的并发构建自动取消旧的，省额度
+# 同一 tag 的并发构建自动取消旧的，省额度
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

@@ -17,6 +17,12 @@ import type {
 } from "./types";
 import type { ChangePasswordOptions, DeviceResponse, UnlockOptions } from "@openyila/core";
 
+/**
+ * 基于 Web Bluetooth API 的 H5 端 BLE 客户端。
+ *
+ * 设备连接 = requestDevice → GATT connect → 发现 NUS 服务/特征 →
+ * 开启 RX 通知。命令通过 TX 写入，应答通过 RX 通知接收。
+ */
 export class BleH5Client implements YilaBleClient {
   private device: BluetoothDevice | null = null;
   private server: BluetoothRemoteGATTServer | null = null;
@@ -24,6 +30,7 @@ export class BleH5Client implements YilaBleClient {
   private rx: BluetoothRemoteGATTCharacteristic | null = null;
 
   get connected(): boolean {
+    // GATT 已连接 + TX/RX 特征都已就绪才算真正可用
     return Boolean(this.server?.connected && this.tx && this.rx);
   }
 
@@ -36,6 +43,7 @@ export class BleH5Client implements YilaBleClient {
       throw new Error("This browser does not support Web Bluetooth.");
     }
 
+    // requestDevice 必须在用户手势的同步调用栈中触发（Web Bluetooth 的安全限制）
     this.device = await navigator.bluetooth.requestDevice({
       filters: [{ namePrefix: options.namePrefix || DEFAULT_DEVICE_NAME_PREFIX }],
       optionalServices: [NUS_SERVICE_UUID],
@@ -45,6 +53,7 @@ export class BleH5Client implements YilaBleClient {
       throw new Error("Bluetooth GATT is not available for this device.");
     }
 
+    // 后续 GATT 连接 / 服务发现 / 特征发现 / 通知开启，每一步都加超时保护
     const connectTimeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
     this.server = await withTimeout(
       this.device.gatt.connect(),
@@ -81,6 +90,7 @@ export class BleH5Client implements YilaBleClient {
   async disconnect(options: DisconnectOptions = {}): Promise<void> {
     if (this.rx) {
       try {
+        // stopNotifications 在某些浏览器上 GATT 已断开后会 reject，忽略即可
         const stoppableRx = this.rx as BluetoothRemoteGATTCharacteristic & {
           stopNotifications?: () => Promise<BluetoothRemoteGATTCharacteristic>;
         };
@@ -111,15 +121,18 @@ export class BleH5Client implements YilaBleClient {
     return this.writeCommand(buildChangePasswordCommand(options), timeoutMs);
   }
 
+  /** 写入一条加密命令，并等待 RX 通知的应答（带超时） */
   private async writeCommand(command: Uint8Array, timeoutMs: number): Promise<DeviceResponse> {
     if (!this.tx || !this.rx) {
       throw new Error("Device is not connected.");
     }
 
+    // 拷贝一份独立 ArrayBuffer：部分浏览器会校验 buffer 来源
     const payload = new ArrayBuffer(command.byteLength);
     new Uint8Array(payload).set(command);
     const responsePromise = waitForResponse(this.rx, timeoutMs);
 
+    // 优先用无响应写（更快），不支持时退回普通写
     if (this.tx.writeValueWithoutResponse) {
       await this.tx.writeValueWithoutResponse(payload);
     } else {
@@ -130,6 +143,10 @@ export class BleH5Client implements YilaBleClient {
   }
 }
 
+/**
+ * 监听特征值变化，等待第一条设备应答。
+ * 超时或收到空数据时返回失败的 DeviceResponse（不抛错，便于上层统一处理）。
+ */
 function waitForResponse(
   characteristic: BluetoothRemoteGATTCharacteristic,
   timeoutMs: number,
@@ -157,6 +174,7 @@ function waitForResponse(
   });
 }
 
+/** 给 Promise 套一层超时：超时则 reject 出指定错误信息 */
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const timeout = window.setTimeout(() => {
@@ -176,6 +194,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
   });
 }
 
+/** setTimeout 的 Promise 化封装 */
 function delay(timeoutMs: number): Promise<void> {
   return new Promise((resolve) => {
     window.setTimeout(resolve, timeoutMs);
