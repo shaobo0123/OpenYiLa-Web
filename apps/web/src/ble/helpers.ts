@@ -39,7 +39,16 @@ export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/** 弹出原生确认框（H5 用 window.confirm，小程序端走 uni 同名 API 的等价逻辑） */
+/** 弹出跨端确认框。 */
 export function confirmDialog(message: string): Promise<boolean> {
-  return Promise.resolve(window.confirm(message));
+  return new Promise((resolve) => {
+    uni.showModal({
+      title: "确认",
+      content: message,
+      confirmText: "确定",
+      cancelText: "取消",
+      success: (result) => resolve(Boolean(result.confirm)),
+      fail: () => resolve(false),
+    });
+  });
 }

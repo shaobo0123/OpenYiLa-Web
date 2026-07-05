@@ -73,7 +73,11 @@ function performUnlock(password: string): void {
   void doUnlock(password);
 }
 
-defineExpose({ performUnlock });
+function getDeviceId(): string {
+  return props.device.id;
+}
+
+defineExpose({ getDeviceId, performUnlock });
 
 async function doUnlock(password: string): Promise<void> {
   if (!/^\d{6}$/.test(password)) {

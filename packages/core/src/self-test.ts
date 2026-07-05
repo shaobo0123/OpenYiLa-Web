@@ -4,6 +4,7 @@ import {
   buildOpenCommand,
   md5Hex,
   parseAdvertisementBattery,
+  parseDeviceResponse,
 } from "./index.js";
 
 /**
@@ -54,5 +55,7 @@ assertEqual(
 // 电量解析：原始厂商数据 vs AD 结构块两种形态
 assertEqual(String(parseAdvertisementBattery(Uint8Array.from([0x0e, 0xe9, 0x86, 0x5a, 0x04, 0xdc, 0x05]))), "5", "battery raw manufacturer data");
 assertEqual(String(parseAdvertisementBattery(Uint8Array.from([0x03, 0xff, 0x00, 0x04]))), "4", "battery advertisement block");
+assertEqual(parseDeviceResponse(Uint8Array.from([0x05])).success ? "true" : "false", "true", "single-byte battery response success");
+assertEqual(String(parseDeviceResponse(Uint8Array.from([0x05])).batteryLevel), "5", "single-byte battery response level");
 
 console.log("openyila core self-test passed");

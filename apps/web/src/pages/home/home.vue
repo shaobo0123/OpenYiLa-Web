@@ -170,7 +170,7 @@ function closeUnlockSheet(): void {
 async function onUnlockConfirm(password: string): Promise<void> {
   const deviceId = unlockSheet.value.deviceId;
   const card = deviceCardRefs.value.find(
-    (c) => (c as unknown as { device?: DeviceRecord }).device?.id === deviceId,
+    (c) => (c as unknown as { getDeviceId?: () => string }).getDeviceId?.() === deviceId,
   );
   unlockSheet.value.busy = true;
   unlockSheet.value.message = "";
@@ -180,6 +180,8 @@ async function onUnlockConfirm(password: string): Promise<void> {
     typeof (card as unknown as { performUnlock?: (p: string) => void }).performUnlock === "function"
   ) {
     (card as unknown as { performUnlock: (p: string) => void }).performUnlock(password);
+  } else {
+    onNotify(t("admin.noDevice"), true);
   }
   unlockSheet.value.busy = false;
 }

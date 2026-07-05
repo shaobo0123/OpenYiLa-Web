@@ -15,24 +15,28 @@
 		{
 			"path": "pages/add/add",
 			"style": {
+				"navigationStyle": "custom",
 				"navigationBarTitleText": "添加设备"
 			}
 		},
 		{
 			"path": "pages/manage/manage",
 			"style": {
+				"navigationStyle": "custom",
 				"navigationBarTitleText": "设备管理"
 			}
 		},
 		{
 			"path": "pages/password/password",
 			"style": {
+				"navigationStyle": "custom",
 				"navigationBarTitleText": "修改密码"
 			}
 		},
 		{
 			"path": "pages/settings/settings",
 			"style": {
+				"navigationStyle": "custom",
 				"navigationBarTitleText": "全局设置"
 			}
 		}

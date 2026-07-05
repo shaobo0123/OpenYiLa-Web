@@ -131,6 +131,7 @@ export function parseDeviceResponse(data: Uint8Array): DeviceResponse {
   // 单字节应答直接视为电量等级（设备上电上报场景）
   if (data.length === 1 && data[0]! >= 1 && data[0]! <= 5) {
     batteryLevel = data[0]!;
+    return deviceResponse(true, "OK", batteryLevel);
   }
 
   // 仅保留可见 ASCII + 制表/换行/回车，过滤掉控制字符

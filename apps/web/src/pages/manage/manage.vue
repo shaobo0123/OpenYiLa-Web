@@ -1,44 +1,47 @@
 <template>
-  <view class="manage">
-    <view v-if="device" class="summary">
-      <view class="title-row">
-        <view class="device-title">
-          <text class="device-name">{{ device.name }}</text>
-          <view class="tag-row">
-            <wd-tag :type="connected ? 'success' : 'default'" round>
-              {{ connected ? t("device.connectedShort") : t("device.offlineShort") }}
-            </wd-tag>
-            <wd-tag round>{{ batteryText }}</wd-tag>
+  <view>
+    <PageNav :title="t('admin.currentSettings')" />
+    <view class="manage">
+      <view v-if="device" class="summary">
+        <view class="title-row">
+          <view class="device-title">
+            <text class="device-name">{{ device.name }}</text>
+            <view class="tag-row">
+              <wd-tag :type="connected ? 'success' : 'default'" round>
+                {{ connected ? t("device.connectedShort") : t("device.offlineShort") }}
+              </wd-tag>
+              <wd-tag round>{{ batteryText }}</wd-tag>
+            </view>
           </view>
         </view>
       </view>
-    </view>
 
-    <wd-status-tip v-else image="content" :tip="t('admin.noDevice')" />
+      <wd-status-tip v-else image="content" :tip="t('admin.noDevice')" />
 
-    <view v-if="device" class="section-card">
-      <TimingPanel
-        :settings="device.settings"
-        :busy="busyKind === 'save'"
-        :message="timingMessage"
-        :is-error="timingError"
-        @save="onSaveTiming"
-        @reset="onResetTiming"
-      />
-    </view>
+      <view v-if="device" class="section-card">
+        <TimingPanel
+          :settings="device.settings"
+          :busy="busyKind === 'save'"
+          :message="timingMessage"
+          :is-error="timingError"
+          @save="onSaveTiming"
+          @reset="onResetTiming"
+        />
+      </view>
 
-    <view v-if="device" class="section-card">
-      <wd-button block @click="goPassword">
-        {{ t("action.changePassword") }}
-      </wd-button>
-    </view>
+      <view v-if="device" class="section-card">
+        <wd-button block @click="goPassword">
+          {{ t("action.changePassword") }}
+        </wd-button>
+      </view>
 
-    <view v-if="device" class="section-card danger-card">
-      <text class="section-title">{{ t("action.delete") }}</text>
-      <wd-notice-bar v-if="deleteMessage" :type="deleteError ? 'danger' : 'info'" :text="deleteMessage" />
-      <wd-button type="error" block :loading="busyKind === 'delete'" :disabled="busyKind === 'delete'" @click="onDelete">
-        {{ t("action.delete") }}
-      </wd-button>
+      <view v-if="device" class="section-card danger-card">
+        <text class="section-title">{{ t("action.delete") }}</text>
+        <wd-notice-bar v-if="deleteMessage" :type="deleteError ? 'danger' : 'info'" :text="deleteMessage" />
+        <wd-button type="error" block :loading="busyKind === 'delete'" :disabled="busyKind === 'delete'" @click="onDelete">
+          {{ t("action.delete") }}
+        </wd-button>
+      </view>
     </view>
   </view>
 </template>
@@ -51,6 +54,7 @@
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { onLoad, onShow } from "@dcloudio/uni-app";
+import PageNav from "../../components/PageNav.vue";
 import TimingPanel from "../../components/TimingPanel.vue";
 import { getBleClient } from "../../ble";
 import { errorMessage, confirmDialog } from "../../ble/helpers";
@@ -84,7 +88,7 @@ const batteryText = computed(() =>
 );
 
 onLoad((query) => {
-  deviceId.value = (query?.id as string) || "";
+  deviceId.value = readRouteDeviceId(query);
   refresh();
 });
 
@@ -96,6 +100,19 @@ onShow(() => {
 function refresh(): void {
   device.value = deviceId.value ? findDevice(deviceId.value) : null;
   connected.value = getBleClient().connectedDeviceId === deviceId.value;
+}
+
+function readRouteDeviceId(query: Record<string, unknown> | undefined): string {
+  const raw = query?.id;
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value !== "string") {
+    return "";
+  }
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 /** 保存新的时序设置到本地存储 */

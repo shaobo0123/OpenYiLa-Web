@@ -18,15 +18,33 @@ import type {
 } from "./types";
 import type { ChangePasswordOptions, DeviceResponse, UnlockOptions } from "@openyila/core";
 
-/** 微信小程序 BLE 单次写入最大字节（NUS 通道的常规 MTU 限制） */
+/** BLE ATT 默认 MTU 下的有效写入上限（MTU 23 − 3 ATT 头），仅用于 setBLEMTU 的判定下限 */
 const BLE_WRITE_CHUNK_SIZE = 20;
+/** Android 小程序端尽量协商更大的 MTU（仅部分系统支持，失败不影响整包写入） */
+const BLE_REQUEST_MTU = 128;
 /** 两次分片写入之间的间隔（毫秒），给设备留处理时间 */
 const BLE_WRITE_CHUNK_DELAY_MS = 30;
+/**
+ * setBLEMTU 失败时的默认单次写入上限（对应常见协商 MTU 247 − 3 ATT 头）。
+ *
+ * 关键：YiLa 设备把每次 writeBLECharacteristicValue 当作一条独立命令解析，
+ *       绝不能按 20 字节分片——必须一次性写入完整 64 字节命令，否则设备会把
+ *       半包当完整命令处理并回 ERROR（0x45 0x52 0x52 0x4F 0x52）。
+ *
+ * 现代 Android/iOS 在建立 GATT 连接时系统通常会自动协商出 ≥185 的 ATT MTU
+ * （H5 Web Bluetooth 在同一台手机能一次写 64 字节即为证），远大于 YiLa 命令长度。
+ * setBLEMTU 只是「确认」而非「必需」，失败也按整包写即可。
+ */
+const BLE_DEFAULT_MAX_WRITE_BYTES = 244;
 
 /** uni API 的回调返回结构 */
 type UniCallbackResult = {
   errCode?: number;
   errMsg?: string;
+};
+
+type UniMtuResult = UniCallbackResult & {
+  mtu?: number;
 };
 
 /** 扫描/发现到的设备 */
@@ -81,6 +99,7 @@ export class BleUniClient implements YilaBleClient {
   private txCharacteristicId: string | null = null;
   private rxCharacteristicId: string | null = null;
   private txWriteType: "write" | "writeNoResponse" | undefined;
+  private maxWriteBytes = BLE_DEFAULT_MAX_WRITE_BYTES;
   private notificationReady = false;
   private valueHandler: ((event: UniBleValueChangeEvent) => void) | null = null;
   private pendingResponse: PendingResponse | null = null;
@@ -121,10 +140,19 @@ export class BleUniClient implements YilaBleClient {
       "蓝牙连接超时。",
     );
 
-    // 尝试协商更大的 MTU（仅部分 Android 支持，失败无影响）
-    await callUni("setBLEMTU", { deviceId: device.deviceId, mtu: 128 }).catch(() => {
-      // setBLEMTU only works on some Android environments. A failed MTU request is harmless.
-    });
+    this.maxWriteBytes = BLE_DEFAULT_MAX_WRITE_BYTES;
+    // 尝试确认系统已协商的 MTU（仅部分 Android 支持 setBLEMTU；失败不影响整包写入）
+    await callUni<UniMtuResult>("setBLEMTU", { deviceId: device.deviceId, mtu: BLE_REQUEST_MTU })
+      .then((result) => {
+        const mtu = Number(result.mtu || BLE_REQUEST_MTU);
+        if (Number.isFinite(mtu) && mtu > BLE_WRITE_CHUNK_SIZE + 3) {
+          this.maxWriteBytes = Math.max(BLE_WRITE_CHUNK_SIZE, Math.floor(mtu) - 3);
+        }
+      })
+      .catch(() => {
+        // setBLEMTU 失败（iOS 不支持、或系统已自动协商大 MTU 时冲突报 internal error）
+        // 不影响整包写入：保持 BLE_DEFAULT_MAX_WRITE_BYTES，依赖系统底层 ATT MTU 即可
+      });
 
     // 4) 发现 NUS 服务与 TX/RX 特征
     const serviceId = await this.resolveServiceId(device.deviceId, connectTimeoutMs);
@@ -196,6 +224,7 @@ export class BleUniClient implements YilaBleClient {
     this.txCharacteristicId = null;
     this.rxCharacteristicId = null;
     this.txWriteType = undefined;
+    this.maxWriteBytes = BLE_DEFAULT_MAX_WRITE_BYTES;
     this.notificationReady = false;
   }
 
@@ -308,11 +337,11 @@ export class BleUniClient implements YilaBleClient {
       throw new Error("不是支持的 YiLa 设备：未找到 NUS TX/RX 特征。");
     }
 
-    // 写入方式：优先无响应写（更快），其次普通写
-    const txWriteType = tx.properties?.writeNoResponse
-      ? "writeNoResponse"
-      : tx.properties?.write
-        ? "write"
+    // 写入方式：优先普通写（更稳），其次无响应写。
+    const txWriteType = tx.properties?.write
+      ? "write"
+      : tx.properties?.writeNoResponse
+        ? "writeNoResponse"
         : undefined;
 
     if (!txWriteType) {
@@ -329,7 +358,7 @@ export class BleUniClient implements YilaBleClient {
     };
   }
 
-  /** 按 20 字节分片写入命令，并等待应答（带超时） */
+  /** 按 maxWriteBytes 分片写入命令，并等待应答（带超时） */
   private async writeCommand(command: Uint8Array, timeoutMs: number): Promise<DeviceResponse> {
     if (!this.connected || !this.deviceId || !this.serviceId || !this.txCharacteristicId) {
       throw new Error("设备未连接。");
@@ -337,8 +366,12 @@ export class BleUniClient implements YilaBleClient {
 
     const responsePromise = this.waitForResponse(timeoutMs);
     try {
-      for (let offset = 0; offset < command.byteLength; offset += BLE_WRITE_CHUNK_SIZE) {
-        const chunk = command.slice(offset, offset + BLE_WRITE_CHUNK_SIZE);
+      const chunkSize = Math.max(BLE_WRITE_CHUNK_SIZE, this.maxWriteBytes);
+      for (let offset = 0; offset < command.byteLength; offset += chunkSize) {
+        if (!this.pendingResponse) {
+          break;
+        }
+        const chunk = command.slice(offset, offset + chunkSize);
         const writeOptions: Record<string, unknown> = {
           deviceId: this.deviceId,
           serviceId: this.serviceId,
@@ -352,7 +385,7 @@ export class BleUniClient implements YilaBleClient {
 
         await callUni("writeBLECharacteristicValue", writeOptions);
         // 不是最后一片时，间隔一小段时间再写下一片
-        if (offset + BLE_WRITE_CHUNK_SIZE < command.byteLength) {
+        if (offset + chunkSize < command.byteLength) {
           await delay(BLE_WRITE_CHUNK_DELAY_MS);
         }
       }
@@ -362,7 +395,8 @@ export class BleUniClient implements YilaBleClient {
       throw error;
     }
 
-    return responsePromise;
+    const response = await responsePromise;
+    return response;
   }
 
   /** 注册一条命令的应答等待：先取消旧的，再起一个带超时的 Promise */

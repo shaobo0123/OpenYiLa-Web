@@ -1,22 +1,25 @@
 <template>
-  <view class="password">
-    <view v-if="device" class="page-head">
-      <text class="title">{{ t("admin.passwordTitle") }}</text>
-      <text class="hint">{{ device.name }}</text>
-    </view>
+  <view>
+    <PageNav :title="t('admin.passwordTitle')" />
+    <view class="password">
+      <view v-if="device" class="page-head">
+        <text class="title">{{ t("admin.passwordTitle") }}</text>
+        <text class="hint">{{ device.name }}</text>
+      </view>
 
-    <view v-if="device" class="section-card">
-      <PasswordPanel
-        ref="passwordPanelRef"
-        :busy="busy"
-        :busy-label="t('status.changingPassword')"
-        :message="message"
-        :is-error="isError"
-        @submit="onChangePassword"
-      />
-    </view>
+      <view v-if="device" class="section-card">
+        <PasswordPanel
+          ref="passwordPanelRef"
+          :busy="busy"
+          :busy-label="t('status.changingPassword')"
+          :message="message"
+          :is-error="isError"
+          @submit="onChangePassword"
+        />
+      </view>
 
-    <wd-status-tip v-else image="content" :tip="t('admin.noDevice')" />
+      <wd-status-tip v-else image="content" :tip="t('admin.noDevice')" />
+    </view>
   </view>
 </template>
 
@@ -28,6 +31,7 @@
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { onLoad } from "@dcloudio/uni-app";
+import PageNav from "../../components/PageNav.vue";
 import PasswordPanel from "../../components/PasswordPanel.vue";
 import { getBleClient } from "../../ble";
 import { ensureConnectedToDevice, errorMessage } from "../../ble/helpers";
@@ -44,9 +48,22 @@ const isError = ref(false);
 const passwordPanelRef = ref<InstanceType<typeof PasswordPanel> | null>(null);
 
 onLoad((query) => {
-  deviceId.value = (query?.id as string) || "";
+  deviceId.value = readRouteDeviceId(query);
   device.value = deviceId.value ? findDevice(deviceId.value) : null;
 });
+
+function readRouteDeviceId(query: Record<string, unknown> | undefined): string {
+  const raw = query?.id;
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value !== "string") {
+    return "";
+  }
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
 
 async function onChangePassword(form: {
   oldPassword: string;
