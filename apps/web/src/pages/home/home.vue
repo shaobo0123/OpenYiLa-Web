@@ -1,5 +1,5 @@
 <template>
-  <view class="shell">
+  <view class="shell" :style="shellStyle">
     <view class="hero">
       <view>
         <text class="eyebrow">OpenYiLa BLE</text>
@@ -78,11 +78,16 @@ const unlockSheet = ref({
 });
 
 const bleSupported = ref(true);
+const shellPaddingTop = ref("48rpx");
 const supportText = computed(() =>
   bleSupported.value ? t("app.badgeReady") : t("app.badgeUnsupported"),
 );
+const shellStyle = computed(() => ({
+  paddingTop: shellPaddingTop.value,
+}));
 
 onMounted(() => {
+  updateCustomNavigationInset();
   refresh();
   checkBleSupport();
 });
@@ -105,6 +110,24 @@ function checkBleSupport(): void {
   // #endif
   // #ifndef H5
   bleSupported.value = true;
+  // #endif
+}
+
+/** 首页使用 custom navigation，需要避开微信状态栏和右上角胶囊按钮。 */
+function updateCustomNavigationInset(): void {
+  // #ifdef MP-WEIXIN
+  const wxUni = uni as unknown as {
+    getMenuButtonBoundingClientRect?: () => { bottom: number };
+    getWindowInfo?: () => { statusBarHeight?: number };
+    getSystemInfoSync?: () => { statusBarHeight?: number };
+  };
+  const menuButton = wxUni.getMenuButtonBoundingClientRect?.();
+  if (menuButton?.bottom) {
+    shellPaddingTop.value = `${menuButton.bottom + 12}px`;
+    return;
+  }
+  const windowInfo = wxUni.getWindowInfo?.() ?? wxUni.getSystemInfoSync?.();
+  shellPaddingTop.value = `${(windowInfo?.statusBarHeight ?? 24) + 48}px`;
   // #endif
 }
 

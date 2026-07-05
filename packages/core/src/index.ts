@@ -27,7 +27,7 @@ export const DEFAULT_RESPONSE_TIMEOUT_MS = 6000;
 export const DEFAULT_DISCONNECT_DELAY_MS = 500;
 
 /** 外层 AES-128 加密密钥（16 字节），设备固件侧约定 */
-const OUTER_AES_KEY = new TextEncoder().encode("Fx4k6AWivOsLE4NI");
+const OUTER_AES_KEY = utf8Bytes("Fx4k6AWivOsLE4NI");
 
 /** 开锁命令参数 */
 export type UnlockOptions = {
@@ -327,7 +327,33 @@ function rotateLeft(value: number, amount: number): number {
 
 /** 字符串 → UTF-8 字节 */
 function utf8Bytes(text: string): Uint8Array {
-  return new TextEncoder().encode(text);
+  const bytes: number[] = [];
+  for (let index = 0; index < text.length; index += 1) {
+    let code = text.charCodeAt(index);
+    if (code >= 0xd800 && code <= 0xdbff && index + 1 < text.length) {
+      const next = text.charCodeAt(index + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        code = 0x10000 + ((code - 0xd800) << 10) + (next - 0xdc00);
+        index += 1;
+      }
+    }
+
+    if (code <= 0x7f) {
+      bytes.push(code);
+    } else if (code <= 0x7ff) {
+      bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
+    } else if (code <= 0xffff) {
+      bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+    } else {
+      bytes.push(
+        0xf0 | (code >> 18),
+        0x80 | ((code >> 12) & 0x3f),
+        0x80 | ((code >> 6) & 0x3f),
+        0x80 | (code & 0x3f),
+      );
+    }
+  }
+  return Uint8Array.from(bytes);
 }
 
 /** AES S-Box 置换表 */
