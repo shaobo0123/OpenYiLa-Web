@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "node scripts/link-web-node-modules.mjs",
     "dev": "npm --workspace apps/web run dev",
     "build": "npm --workspace packages/core run build && npm --workspace apps/web run build",
     "build:app": "npm --workspace packages/core run build && npm --workspace apps/web run build:app",
