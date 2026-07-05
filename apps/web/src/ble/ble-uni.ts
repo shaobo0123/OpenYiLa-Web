@@ -134,18 +134,38 @@ export class BleUniClient implements YilaBleClient {
   async connect(options: ConnectOptions = {}): Promise<ConnectionInfo> {
     const namePrefix = options.namePrefix || DEFAULT_DEVICE_NAME_PREFIX;
     const connectTimeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
+    const knownDeviceId = options.deviceId?.trim();
 
     // 1) 打开蓝牙适配器（要求系统蓝牙已开启）
     await callUni("openBluetoothAdapter", {}, "蓝牙适配器初始化失败，请确认蓝牙已开启。");
 
-    // 2) 扫描并匹配到目标设备
+    // 2) 已绑定设备优先使用保存的 deviceId 直连，跳过 0-6 秒扫描和停止扫描缓冲。
+    if (knownDeviceId) {
+      await stopDiscoveryQuietly();
+      return this.connectResolvedDevice(
+        { deviceId: knownDeviceId, name: namePrefix, localName: namePrefix },
+        namePrefix,
+        connectTimeoutMs,
+      );
+    }
+
+    // 3) 未知设备（添加设备）才扫描并匹配目标设备
     const device = await this.scanForDevice(namePrefix);
     await stopDiscoveryQuietly();
     // 停止扫描到 createBLEConnection 之间必须留出缓冲：微信 Android 端在系统扫描
     // 真正停下来前发起 GATT 连接会高频返回 status 133（GATT_ERROR）。
     await delay(BLE_STOP_DISCOVERY_SETTLE_MS);
 
-    // 3) 建立 GATT 连接。status 133 常见为一次性失败，最多重试一次。
+    return this.connectResolvedDevice(device, namePrefix, connectTimeoutMs);
+  }
+
+  /** 对已解析出的设备建立 GATT 连接，并完成服务/特征/通知初始化 */
+  private async connectResolvedDevice(
+    device: UniBleDevice,
+    namePrefix: string,
+    connectTimeoutMs: number,
+  ): Promise<ConnectionInfo> {
+    // 1) 建立 GATT 连接。status 133 常见为一次性失败，最多重试一次。
     await this.createConnectionWithRetry(device.deviceId, connectTimeoutMs);
 
     this.maxWriteBytes = BLE_DEFAULT_MAX_WRITE_BYTES;
@@ -162,7 +182,7 @@ export class BleUniClient implements YilaBleClient {
         // 不影响整包写入：保持 BLE_DEFAULT_MAX_WRITE_BYTES，依赖系统底层 ATT MTU 即可
       });
 
-    // 4) 发现 NUS 服务与 TX/RX 特征
+    // 2) 发现 NUS 服务与 TX/RX 特征
     const serviceId = await this.resolveServiceId(device.deviceId, connectTimeoutMs);
     const characteristics = await this.resolveCharacteristics(
       device.deviceId,
@@ -178,7 +198,7 @@ export class BleUniClient implements YilaBleClient {
     this.txWriteType = characteristics.txWriteType;
     this.bindValueHandler();
 
-    // 5) 开启 RX 通知（设备应答通过此通道上报）
+    // 3) 开启 RX 通知（设备应答通过此通道上报）
     await withTimeout(
       callUni("notifyBLECharacteristicValueChange", {
         state: true,

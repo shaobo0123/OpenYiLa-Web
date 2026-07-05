@@ -38,6 +38,8 @@ export interface YilaBleClient {
 }
 
 export type ConnectOptions = {
+  /** 已保存的平台设备标识；小程序/App 可用它跳过扫描直接连接 */
+  deviceId?: string;
   /** 设备名前缀过滤（默认走 DEFAULT_DEVICE_NAME_PREFIX） */
   namePrefix?: string;
   /** 连接超时（毫秒） */

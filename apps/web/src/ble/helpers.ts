@@ -24,7 +24,7 @@ export async function ensureConnectedToDevice(device: DeviceRecord): Promise<Dev
     await client.disconnect();
   }
   const namePrefix = device.name || readSearchPrefix();
-  const info = await client.connect({ namePrefix });
+  const info = await client.connect({ deviceId: device.id, namePrefix });
   saveSearchPrefix(namePrefix);
   return upsertDevice({
     ...device,
