@@ -1,5 +1,5 @@
 {
-  "name": "yila-web-control",
+  "name": "openyila",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -9,8 +9,10 @@
   ],
   "scripts": {
     "dev": "npm --workspace apps/web run dev",
-    "build": "npm --workspace packages/yila-core run build && npm --workspace apps/web run build",
-    "test": "npm --workspace packages/yila-core run test"
+    "build": "npm --workspace packages/core run build && npm --workspace apps/web run build",
+    "build:app": "npm --workspace packages/core run build && npm --workspace apps/web run build:app",
+    "build:mp-weixin": "npm --workspace packages/core run build && npm --workspace apps/web run build:mp-weixin",
+    "test": "npm --workspace packages/core run test"
   },
   "devDependencies": {
     "typescript": "^5.5.4",

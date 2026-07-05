@@ -2,7 +2,7 @@
   <view class="shell">
     <view class="hero">
       <view>
-        <text class="eyebrow">YiLa BLE</text>
+        <text class="eyebrow">OpenYiLa BLE</text>
         <text class="title">{{ t("app.title") }}</text>
       </view>
       <view class="hero-actions">

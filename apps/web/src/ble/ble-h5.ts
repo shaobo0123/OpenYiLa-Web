@@ -8,14 +8,14 @@ import {
   buildChangePasswordCommand,
   buildOpenCommand,
   parseDeviceResponse,
-} from "@yila/core";
+} from "@openyila/core";
 import type {
   ConnectionInfo,
   ConnectOptions,
   DisconnectOptions,
   YilaBleClient,
 } from "./types";
-import type { ChangePasswordOptions, DeviceResponse, UnlockOptions } from "@yila/core";
+import type { ChangePasswordOptions, DeviceResponse, UnlockOptions } from "@openyila/core";
 
 export class BleH5Client implements YilaBleClient {
   private device: BluetoothDevice | null = null;

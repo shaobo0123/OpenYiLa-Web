@@ -1,10 +1,12 @@
 {
-  "name": "@yila/web",
+  "name": "@openyila/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "uni",
-    "build": "uni build"
+    "build": "uni build",
+    "build:app": "uni build -p app",
+    "build:mp-weixin": "uni build -p mp-weixin"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-5010420260703001",
@@ -23,7 +25,7 @@
     "@dcloudio/uni-mp-weixin": "3.0.0-5010420260703001",
     "@dcloudio/uni-mp-xhs": "3.0.0-5010420260703001",
     "@dcloudio/uni-quickapp-webview": "3.0.0-5010420260703001",
-    "@yila/core": "file:../../packages/yila-core",
+    "@openyila/core": "file:../../packages/core",
     "vue": "3.5.39",
     "vue-i18n": "9.14.5",
     "wot-design-uni": "^1.14.0"

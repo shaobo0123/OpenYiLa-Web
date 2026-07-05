@@ -1,10 +1,11 @@
 import { createSSRApp } from "vue";
+import type { Plugin } from "vue";
 import App from "./App.vue";
 import { i18n } from "./i18n";
 
 export function createApp() {
   const app = createSSRApp(App);
-  app.use(i18n);
+  app.use(i18n as unknown as Plugin);
   return {
     app,
   };

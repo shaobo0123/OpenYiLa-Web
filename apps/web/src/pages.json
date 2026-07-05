@@ -39,7 +39,7 @@
 	],
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
-		"navigationBarTitleText": "YiLa",
+		"navigationBarTitleText": "OpenYiLa",
 		"navigationBarBackgroundColor": "#eef2ef",
 		"backgroundColor": "#eef2ef"
 	}

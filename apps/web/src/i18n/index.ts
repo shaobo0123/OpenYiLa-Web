@@ -7,12 +7,12 @@ export const LOCALES: { value: Locale; label: string }[] = [
   { value: "en-US", label: "English" },
 ];
 
-const LOCALE_STORAGE_KEY = "yila.locale";
+const LOCALE_STORAGE_KEY = "openyila.locale";
 
 const messages = {
   "zh-CN": {
     app: {
-      title: "YiLa 开门",
+      title: "OpenYiLa 开门",
       badgeReady: "蓝牙可用",
       badgeUnsupported: "不支持",
     },
@@ -96,7 +96,7 @@ const messages = {
 
   "en-US": {
     app: {
-      title: "YiLa Unlock",
+      title: "OpenYiLa Unlock",
       badgeReady: "Bluetooth Ready",
       badgeUnsupported: "Unsupported",
     },

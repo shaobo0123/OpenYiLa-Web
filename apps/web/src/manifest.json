@@ -1,11 +1,41 @@
 {
-  "name": "YiLa",
+  "name": "OpenYiLa",
   "appid": "",
-  "description": "YiLa BLE door control",
+  "description": "OpenYiLa BLE door control",
   "versionName": "1.0.0",
   "versionCode": "100",
   "transformPx": false,
   "h5": {},
+  "mp-weixin": {
+    "requiredPrivateInfos": [
+      "openBluetoothAdapter",
+      "startBluetoothDevicesDiscovery",
+      "onBluetoothDeviceFound",
+      "getBluetoothDevices",
+      "getConnectedBluetoothDevices",
+      "getBLEDeviceServices",
+      "getBLEDeviceCharacteristics"
+    ]
+  },
+  "app-plus": {
+    "distribute": {
+      "android": {
+        "permissions": [
+          "<uses-permission android:name=\"android.permission.BLUETOOTH\"/>",
+          "<uses-permission android:name=\"android.permission.BLUETOOTH_ADMIN\"/>",
+          "<uses-permission android:name=\"android.permission.BLUETOOTH_SCAN\"/>",
+          "<uses-permission android:name=\"android.permission.BLUETOOTH_CONNECT\"/>",
+          "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\"/>"
+        ]
+      },
+      "ios": {
+        "privacyDescription": {
+          "NSBluetoothAlwaysUsageDescription": "用于连接 OpenYiLa 蓝牙门锁。",
+          "NSBluetoothPeripheralUsageDescription": "用于连接 OpenYiLa 蓝牙门锁。"
+        }
+      }
+    }
+  },
   "uniStatistics": {
     "enable": false
   },

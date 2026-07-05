@@ -1,4 +1,4 @@
-import { DEFAULT_DEVICE_NAME_PREFIX } from "@yila/core";
+import { DEFAULT_DEVICE_NAME_PREFIX } from "@openyila/core";
 
 export type Settings = {
   openTimeMs: number;
@@ -27,8 +27,8 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export const DEFAULT_DEVICE_NAME = DEFAULT_DEVICE_NAME_PREFIX;
 
-const DEVICES_KEY = "yila.devices";
-const SEARCH_PREFIX_KEY = "yila.search.namePrefix";
+const DEVICES_KEY = "openyila.devices";
+const SEARCH_PREFIX_KEY = "openyila.search.namePrefix";
 
 export function readDevices(): DeviceRecord[] {
   const raw = uni.getStorageSync(DEVICES_KEY) as string | null;

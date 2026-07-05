@@ -1,4 +1,4 @@
-import type { UnlockOptions, ChangePasswordOptions, DeviceResponse } from "@yila/core";
+import type { UnlockOptions, ChangePasswordOptions, DeviceResponse } from "@openyila/core";
 
 /**
  * 三端统一的 BLE 客户端接口。
