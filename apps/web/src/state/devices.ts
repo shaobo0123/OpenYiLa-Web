@@ -21,6 +21,8 @@ export type DeviceRecord = {
   id: string;
   /** 用户可见的设备名 */
   name: string;
+  /** 开锁密码（6 位数字），缺省为 DEFAULT_PASSWORD */
+  password: string;
   /** 电量等级 1-5，未上报时缺省 */
   batteryLevel?: number;
   /** 开锁时序设置 */
@@ -42,6 +44,9 @@ export const DEFAULT_SETTINGS: Settings = {
   closeTimeMs: 800,
   reverse: false,
 };
+
+/** 默认开锁密码（与设备出厂一致） */
+export const DEFAULT_PASSWORD = "123456";
 
 /** 默认设备名（与广播名前缀一致） */
 export const DEFAULT_DEVICE_NAME = DEFAULT_DEVICE_NAME_PREFIX;
@@ -66,12 +71,13 @@ export function readDevices(): DeviceRecord[] {
     if (!Array.isArray(parsed)) {
       return [];
     }
-    return parsed
+      return parsed
       .filter((device) => device.id && device.name)
       .map((device) => {
         const record: DeviceRecord = {
           id: String(device.id),
           name: String(device.name),
+          password: normalizePassword(device.password),
           settings: normalizeSettings(device.settings || {}),
           createdAt: normalizeTimestamp(device.createdAt),
           updatedAt: normalizeTimestamp(device.updatedAt),
@@ -120,6 +126,7 @@ export function upsertDevice(
   const device: DeviceRecord = {
     id: input.id,
     name: input.name,
+    password: normalizePassword(input.password || existing?.password),
     settings: normalizeSettings(input.settings || existing?.settings || DEFAULT_SETTINGS),
     createdAt: input.createdAt || existing?.createdAt || now,
     updatedAt: now,
@@ -158,6 +165,18 @@ export function updateDeviceSettings(
   return upsertDevice({ ...device, settings });
 }
 
+/** 仅更新某台设备的开锁密码，返回更新后的记录（设备不存在返回 null） */
+export function updateDevicePassword(
+  deviceId: string,
+  password: string,
+): DeviceRecord | null {
+  const device = findDevice(deviceId);
+  if (!device) {
+    return null;
+  }
+  return upsertDevice({ ...device, password });
+}
+
 /** 删除指定 id 的设备记录 */
 export function deleteDeviceRecord(deviceId: string): void {
   saveDevices(readDevices().filter((item) => item.id !== deviceId));
@@ -193,6 +212,11 @@ function clampTime(value: unknown, fallback: number): number {
     return fallback;
   }
   return Math.min(10000, Math.max(0, Math.round(numberValue)));
+}
+
+/** 校验开锁密码：必须是 6 位数字字符串，否则回退默认密码 */
+function normalizePassword(value: unknown): string {
+  return typeof value === "string" && /^\d{6}$/.test(value) ? value : DEFAULT_PASSWORD;
 }
 
 /** 把任意输入转成有效时间戳（毫秒），非法或非正时回退当前时间 */

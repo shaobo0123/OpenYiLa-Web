@@ -4,9 +4,7 @@
       <view class="device-title">
         <text class="device-name">{{ device.name }}</text>
         <view class="tag-row">
-          <wd-tag :type="connected ? 'success' : 'default'" round>
-            {{ connected ? t("device.connectedShort") : t("device.offlineShort") }}
-          </wd-tag>
+          <view class="status-dot" :class="connected ? 'status-dot--on' : 'status-dot--off'" />
           <wd-tag round>{{ batteryText }}</wd-tag>
         </view>
       </view>
@@ -25,7 +23,7 @@
 <script setup lang="ts">
 /**
  * 设备主卡片（首页）：展示设备名/连接状态/电量，并提供一键开锁入口。
- * 开锁时先校验密码格式，再走 BLE 连接 → 下发开锁命令 → 回写设备状态。
+ * 点击一键开锁直接用设备里配置好的密码开锁（默认 123456，可在管理页修改）。
  */
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
@@ -46,8 +44,6 @@ const emit = defineEmits<{
   sessionChange: [];
   /** 通知父组件弹 toast（含是否为错误） */
   notify: [message: string, isError: boolean];
-  /** 用户点了开锁按钮，请求父组件弹出密码输入面板 */
-  requestUnlock: [device: DeviceRecord];
 }>();
 
 const busy = ref(false);
@@ -64,34 +60,16 @@ function onManageClick(): void {
   });
 }
 
+/** 点击一键开锁：直接用设备配置的密码开锁，无需手动输入 */
 async function onUnlockClick(): Promise<void> {
   if (busy.value) return;
-  emit("requestUnlock", props.device);
-}
-
-/** 供父组件通过 ref 调用：用给定密码执行开锁 */
-function performUnlock(password: string): void {
-  void doUnlock(password);
-}
-
-function getDeviceId(): string {
-  return props.device.id;
-}
-
-defineExpose({ getDeviceId, performUnlock });
-
-async function doUnlock(password: string): Promise<void> {
-  if (!/^\d{6}$/.test(password)) {
-    emit("notify", t("status.passwordInvalid"), true);
-    return;
-  }
   busy.value = true;
   try {
     // 按需连接：连上 → 下发开锁命令 → 自动断开，不长期占用 GATT
     const response = await withDeviceConnection(props.device, async (target) => {
       const client = getBleClient();
       return client.open({
-        password,
+        password: target.password,
         openTimeMs: target.settings.openTimeMs,
         waitTimeMs: target.settings.waitTimeMs,
         closeTimeMs: target.settings.closeTimeMs,
@@ -157,7 +135,25 @@ async function doUnlock(password: string): Promise<void> {
 .tag-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 12rpx;
+}
+
+/* 连接状态小圆点：绿=蓝牙已连，灰=未连接 */
+.status-dot {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot--on {
+  background: #2e7d52;
+  box-shadow: 0 0 0 4rpx rgba(46, 125, 82, 0.18);
+}
+
+.status-dot--off {
+  background: #c2c9c4;
 }
 
 .tile-action {

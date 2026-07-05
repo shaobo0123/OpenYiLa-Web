@@ -7,9 +7,7 @@
           <view class="device-title">
             <text class="device-name">{{ device.name }}</text>
             <view class="tag-row">
-              <wd-tag :type="connected ? 'success' : 'default'" round>
-                {{ connected ? t("device.connectedShort") : t("device.offlineShort") }}
-              </wd-tag>
+              <view class="status-dot" :class="connected ? 'status-dot--on' : 'status-dot--off'" />
               <wd-tag round>{{ batteryText }}</wd-tag>
             </view>
           </view>
@@ -27,6 +25,27 @@
           @save="onSaveTiming"
           @reset="onResetTiming"
         />
+      </view>
+
+      <view v-if="device" class="section-card password-card">
+        <text class="section-title">{{ t("admin.openPasswordTitle") }}</text>
+        <text class="section-hint">{{ t("admin.openPasswordHint") }}</text>
+        <wd-cell-group border>
+          <wd-cell :title="t('field.password')">
+            <wd-input
+              :model-value="passwordForm"
+              type="number"
+              :maxlength="6"
+              show-password
+              clearable
+              @update:model-value="onPasswordInput"
+            />
+          </wd-cell>
+        </wd-cell-group>
+        <wd-notice-bar v-if="passwordMessage" :type="passwordError ? 'danger' : 'info'" :text="passwordMessage" />
+        <wd-button type="primary" block :loading="busyKind === 'password'" :disabled="busyKind === 'password'" @click="onSavePassword">
+          {{ t("action.save") }}
+        </wd-button>
       </view>
 
       <view v-if="device" class="section-card">
@@ -62,6 +81,7 @@ import { tt } from "../../i18n";
 import {
   findDevice,
   updateDeviceSettings,
+  updateDevicePassword,
   deleteDeviceRecord,
   DEFAULT_SETTINGS,
   type DeviceRecord,
@@ -74,13 +94,18 @@ const deviceId = ref("");
 const device = ref<DeviceRecord | null>(null);
 const connected = ref(false);
 
-// 当前正在进行的操作类型：'save' | 'delete' | null，用于按钮 loading 态
-const busyKind = ref<"save" | "delete" | null>(null);
+// 当前正在进行的操作类型：'save' | 'password' | 'delete' | null，用于按钮 loading 态
+const busyKind = ref<"save" | "password" | "delete" | null>(null);
 
 const timingMessage = ref("");
 const timingError = ref(false);
 const deleteMessage = ref("");
 const deleteError = ref(false);
+
+// 开锁密码表单（本地存储，开锁时下发用）
+const passwordForm = ref("");
+const passwordMessage = ref("");
+const passwordError = ref(false);
 
 const batteryText = computed(() =>
   device.value?.batteryLevel
@@ -101,6 +126,8 @@ onShow(() => {
 function refresh(): void {
   device.value = deviceId.value ? findDevice(deviceId.value) : null;
   connected.value = getBleClient().connectedDeviceId === deviceId.value;
+  // 同步密码表单为当前设备记录里的密码
+  passwordForm.value = device.value?.password ?? "";
 }
 
 function readRouteDeviceId(query: Record<string, unknown> | undefined): string {
@@ -145,6 +172,35 @@ function onResetTiming(): void {
     timingError.value = false;
     device.value = updated;
     uni.showToast({ title: timingMessage.value, icon: "success" });
+  }
+}
+
+function onPasswordInput(v: string): void {
+  passwordForm.value = v;
+}
+
+/** 保存开锁密码到本地（开锁时下发用，不写设备固件） */
+function onSavePassword(): void {
+  if (!device.value) return;
+  if (!/^\d{6}$/.test(passwordForm.value)) {
+    passwordMessage.value = t("status.passwordInvalid");
+    passwordError.value = true;
+    return;
+  }
+  busyKind.value = "password";
+  try {
+    const updated = updateDevicePassword(device.value.id, passwordForm.value);
+    if (!updated) {
+      passwordMessage.value = t("admin.noDevice");
+      passwordError.value = true;
+      return;
+    }
+    passwordMessage.value = tt("admin.savedFor", { name: updated.name });
+    passwordError.value = false;
+    device.value = updated;
+    uni.showToast({ title: passwordMessage.value, icon: "success" });
+  } finally {
+    busyKind.value = null;
   }
 }
 
@@ -207,6 +263,11 @@ async function onDelete(): Promise<void> {
   box-shadow: 0 18rpx 44rpx rgba(23, 61, 43, 0.08);
 }
 
+.password-card {
+  display: grid;
+  gap: 20rpx;
+}
+
 .summary {
   padding-top: 34rpx;
   padding-bottom: 34rpx;
@@ -235,7 +296,25 @@ async function onDelete(): Promise<void> {
 .tag-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 12rpx;
+}
+
+/* 连接状态小圆点：绿=蓝牙已连，灰=未连接 */
+.status-dot {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot--on {
+  background: #2e7d52;
+  box-shadow: 0 0 0 4rpx rgba(46, 125, 82, 0.18);
+}
+
+.status-dot--off {
+  background: #c2c9c4;
 }
 
 .danger-card {
@@ -244,8 +323,20 @@ async function onDelete(): Promise<void> {
 }
 
 .section-title {
-  color: #8a1f1f;
+  color: #173d2b;
   font-size: 30rpx;
   font-weight: 800;
+}
+
+.section-hint {
+  margin-top: -8rpx;
+  color: #6c7871;
+  font-size: 24rpx;
+  line-height: 1.4;
+}
+
+/* 删除卡里的标题单独用红色警示 */
+.danger-card .section-title {
+  color: #8a1f1f;
 }
 </style>

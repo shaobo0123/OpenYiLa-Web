@@ -20,26 +20,12 @@
       <DeviceCardHero
         v-for="device in devices"
         :key="device.id"
-        ref="deviceCardRefs"
         :device="device"
         :connected="connectedDeviceId === device.id"
         @session-change="refresh"
         @notify="onNotify"
-        @request-unlock="onRequestUnlock"
       />
     </view>
-
-    <UnlockSheet
-      :visible="unlockSheet.visible"
-      :device-name="unlockSheet.deviceName"
-      :meta="unlockSheet.meta"
-      :busy="unlockSheet.busy"
-      :busy-label="t('status.opening')"
-      :message="unlockSheet.message"
-      :is-error="unlockSheet.isError"
-      @close="closeUnlockSheet"
-      @confirm="onUnlockConfirm"
-    />
   </view>
 </template>
 
@@ -48,35 +34,20 @@
  * 首页：展示设备列表与开锁入口。
  * - 空状态显示引导卡片；
  * - 有设备时渲染 DeviceCardHero 列表；
- * - 点击开锁弹出 UnlockSheet 输入密码，确认后调用对应卡片的 performUnlock。
+ * - 点击一键开锁由卡片直接用设备配置的密码开锁（无需手动输入）。
  */
 import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import EmptyState from "../../components/EmptyState.vue";
 import DeviceCardHero from "../../components/DeviceCardHero.vue";
-import UnlockSheet from "../../components/UnlockSheet.vue";
 import { getBleClient } from "../../ble";
-import { readDevices, upsertDevice, type DeviceRecord } from "../../state/devices";
-import { tt } from "../../i18n";
+import { readDevices } from "../../state/devices";
 import { onShow } from "@dcloudio/uni-app";
 
 const { t } = useI18n();
 
 const devices = ref<DeviceRecord[]>([]);
 const connectedDeviceId = ref<string | null>(null);
-// 设备卡片组件实例列表，用于通过 ref 调用 performUnlock
-const deviceCardRefs = ref<InstanceType<typeof DeviceCardHero>[]>([]);
-
-// 开锁弹层的全部状态（合并到一个 ref 便于整体重置）
-const unlockSheet = ref({
-  visible: false,
-  deviceName: "",
-  meta: "",
-  busy: false,
-  message: "",
-  isError: false,
-  deviceId: "",
-});
 
 const bleSupported = ref(true);
 const shellPaddingTop = ref("48rpx");
@@ -148,52 +119,6 @@ function goAddDevice(): void {
 
 function goSettings(): void {
   uni.navigateTo({ url: "/pages/settings/settings" });
-}
-
-/** 用户点了某个卡片的「开锁」：弹出密码输入层 */
-function onRequestUnlock(device: DeviceRecord): void {
-  unlockSheet.value = {
-    visible: true,
-    deviceName: device.name,
-    meta: formatDeviceMeta(device),
-    busy: false,
-    message: "",
-    isError: false,
-    deviceId: device.id,
-  };
-}
-
-function closeUnlockSheet(): void {
-  unlockSheet.value.visible = false;
-}
-
-/** 密码确认：关掉弹层，找到对应卡片实例并调用其 performUnlock */
-async function onUnlockConfirm(password: string): Promise<void> {
-  const deviceId = unlockSheet.value.deviceId;
-  const card = deviceCardRefs.value.find(
-    (c) => (c as unknown as { getDeviceId?: () => string }).getDeviceId?.() === deviceId,
-  );
-  unlockSheet.value.busy = true;
-  unlockSheet.value.message = "";
-  unlockSheet.value.visible = false;
-  if (
-    card &&
-    typeof (card as unknown as { performUnlock?: (p: string) => void }).performUnlock === "function"
-  ) {
-    (card as unknown as { performUnlock: (p: string) => void }).performUnlock(password);
-  } else {
-    onNotify(t("admin.noDevice"), true);
-  }
-  unlockSheet.value.busy = false;
-}
-
-/** 拼装开锁弹层右上角的元信息：方向 · 电量 */
-function formatDeviceMeta(device: DeviceRecord): string {
-  const dir = device.settings.reverse ? t("admin.reverseOn") : t("admin.reverseOff");
-  const bat = device.batteryLevel
-    ? tt("status.battery", { level: device.batteryLevel })
-    : t("device.batteryUnknown");
-  return `${dir} · ${bat}`;
 }
 </script>
 
