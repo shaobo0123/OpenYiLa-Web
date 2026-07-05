@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "版本标签（不填则用 commit sha）"
+        required: false
+
+permissions:
+  contents: write # 创建 Release 需要
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build H5
+        run: npm run build
+
+      - name: Build WeChat Mini Program
+        run: npm run build:mp-weixin
+
+      - name: Pack mp-weixin
+        run: |
+          cd apps/web/dist/build/mp-weixin
+          zip -r "$RUNNER_TEMP/openyila-mp-weixin.zip" .
+
+      - name: Upload H5 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openyila-h5
+          path: apps/web/dist/build/h5
+          if-no-files-found: error
+
+      - name: Upload mp-weixin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openyila-mp-weixin
+          path: ${{ runner.temp }}/openyila-mp-weixin.zip
+          if-no-files-found: error
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: |
+            ${{ runner.temp }}/openyila-mp-weixin.zip
