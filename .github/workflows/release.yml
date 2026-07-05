@@ -30,6 +30,11 @@ jobs:
       - name: Build WeChat Mini Program
         run: npm run build:mp-weixin
 
+      - name: Pack H5
+        run: |
+          cd apps/web/dist/build/h5
+          zip -r "$RUNNER_TEMP/openyila-h5.zip" .
+
       - name: Pack mp-weixin
         run: |
           cd apps/web/dist/build/mp-weixin
@@ -39,7 +44,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: openyila-h5
-          path: apps/web/dist/build/h5
+          path: ${{ runner.temp }}/openyila-h5.zip
           if-no-files-found: error
 
       - name: Upload mp-weixin artifact
@@ -55,4 +60,5 @@ jobs:
           tag_name: ${{ github.ref_name }}
           generate_release_notes: true
           files: |
+            ${{ runner.temp }}/openyila-h5.zip
             ${{ runner.temp }}/openyila-mp-weixin.zip
