@@ -1,7 +1,6 @@
 import {
   DEFAULT_CONNECT_TIMEOUT_MS,
   DEFAULT_DEVICE_NAME_PREFIX,
-  DEFAULT_DISCONNECT_DELAY_MS,
   DEFAULT_RESPONSE_TIMEOUT_MS,
   NUS_RX_CHAR_UUID,
   NUS_SERVICE_UUID,
@@ -9,26 +8,16 @@ import {
   buildChangePasswordCommand,
   buildOpenCommand,
   parseDeviceResponse,
-  type ChangePasswordOptions,
-  type DeviceResponse,
-  type UnlockOptions,
 } from "@yila/core";
+import type {
+  ConnectionInfo,
+  ConnectOptions,
+  DisconnectOptions,
+  YilaBleClient,
+} from "./types";
+import type { ChangePasswordOptions, DeviceResponse, UnlockOptions } from "@yila/core";
 
-export type ConnectionInfo = {
-  deviceName: string;
-  deviceId: string;
-};
-
-export type DeviceRequestOptions = {
-  namePrefix?: string;
-  connectTimeoutMs?: number;
-};
-
-export type DisconnectOptions = {
-  delayMs?: number;
-};
-
-export class YilaWebBleClient {
+export class BleH5Client implements YilaBleClient {
   private device: BluetoothDevice | null = null;
   private server: BluetoothRemoteGATTServer | null = null;
   private tx: BluetoothRemoteGATTCharacteristic | null = null;
@@ -42,7 +31,7 @@ export class YilaWebBleClient {
     return this.connected ? this.device?.id || null : null;
   }
 
-  async connect(options: DeviceRequestOptions = {}): Promise<ConnectionInfo> {
+  async connect(options: ConnectOptions = {}): Promise<ConnectionInfo> {
     if (!navigator.bluetooth) {
       throw new Error("This browser does not support Web Bluetooth.");
     }
@@ -141,19 +130,6 @@ export class YilaWebBleClient {
   }
 }
 
-export async function openAndDisconnect(
-  client: YilaWebBleClient,
-  options: UnlockOptions,
-  responseTimeoutMs = DEFAULT_RESPONSE_TIMEOUT_MS,
-  disconnectDelayMs = DEFAULT_DISCONNECT_DELAY_MS,
-): Promise<DeviceResponse> {
-  try {
-    return await client.open(options, responseTimeoutMs);
-  } finally {
-    await client.disconnect({ delayMs: disconnectDelayMs });
-  }
-}
-
 function waitForResponse(
   characteristic: BluetoothRemoteGATTCharacteristic,
   timeoutMs: number,
@@ -169,7 +145,6 @@ function waitForResponse(
         resolve({ success: false, message: "Empty response" });
         return;
       }
-
       resolve(parseDeviceResponse(new Uint8Array(value.buffer.slice(0))));
     };
 

@@ -10,8 +10,7 @@
   "scripts": {
     "dev": "npm --workspace apps/web run dev",
     "build": "npm --workspace packages/yila-core run build && npm --workspace apps/web run build",
-    "test": "npm --workspace packages/yila-core run test",
-    "preview": "npm --workspace apps/web run preview"
+    "test": "npm --workspace packages/yila-core run test"
   },
   "devDependencies": {
     "typescript": "^5.5.4",
